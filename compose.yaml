@@ -1,0 +1,89 @@
+name: researchpilot
+
+volumes:
+  postgres-data:
+  elasticsearch-data:
+  backend-data:
+  sidecar-model-cache:
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-researchpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-researchpilot}
+      POSTGRES_DB: ${POSTGRES_DB:-researchpilot}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx1024m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200 >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  sidecar:
+    build: ./sidecar
+    volumes:
+      - sidecar-model-cache:/root/.cache
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8100/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.release
+    environment:
+      SERVER_PORT: 8080
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_MODEL: ${LLM_MODEL:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      RP_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-researchpilot}
+      RP_DB_USER: ${POSTGRES_USER:-researchpilot}
+      RP_DB_PASSWORD: ${POSTGRES_PASSWORD:-researchpilot}
+      RP_ES_HOST: elasticsearch
+      RP_SIDECAR_URL: http://sidecar:8100
+      RP_RUNTIME_CONFIG: /app/data/runtime.properties
+      RP_OBJECT_STORE: /app/data/rp-objects
+      RP_BUDGET_TIMEOUT: ${RP_BUDGET_TIMEOUT:-360}
+      RP_LLM_TIMEOUT: ${RP_LLM_TIMEOUT:-120}
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      sidecar:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/rp/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5174:80"
+    depends_on:
+      backend:
+        condition: service_healthy

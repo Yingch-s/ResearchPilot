@@ -1,0 +1,7 @@
+<Configuration status="WARN">
+    <Appenders><Console name="C" target="SYSTEM_OUT"><PatternLayout pattern="%m%n"/></Console></Appenders>
+    <Loggers>
+        <Logger name="com.alibaba.cloud.ai.example.deepresearch.researchpilot" level="INFO"/>
+        <Root level="WARN"><AppenderRef ref="C"/></Root>
+    </Loggers>
+</Configuration>

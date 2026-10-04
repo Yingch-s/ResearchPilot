@@ -1,0 +1,9 @@
+id	label	cosine
+positive-1	SUPPORTED	0.6758
+positive-2	SUPPORTED	0.7879
+positive-3	SUPPORTED	0.8677
+contradiction-1	CONTRADICTED	0.8278
+contradiction-2	CONTRADICTED	0.6945
+unrelated-1	INSUFFICIENT	0.3845
+unrelated-2	INSUFFICIENT	0.5418
+threshold	0.55	close=5/7; supported_recall=3/3

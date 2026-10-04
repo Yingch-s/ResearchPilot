@@ -1,0 +1,13 @@
+[project]
+name = "researchpilot-sidecar"
+version = "0.1.0"
+description = "ResearchPilot Python sidecar：Docling 论文解析 + bge-m3 本地 embedding（OpenAI 兼容）"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "docling>=2.0",
+    "sentence-transformers>=3.0",
+    "numpy",
+]

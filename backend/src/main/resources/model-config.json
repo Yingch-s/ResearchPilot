@@ -1,0 +1,68 @@
+{
+  "models": [
+    {
+      "name": "research",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "background",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "rewriteAndMultiQuery",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "coder",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "coordinator",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "planner",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "reporter",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "interaction",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "infoCheck",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "reflection",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "rag",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "academicResearch",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "lifestyleTravel",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "encyclopedia",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "dataAnalysis",
+      "modelName": "deepseek-flash"
+    },
+    {
+      "name": "shortMemory",
+      "modelName": "deepseek-flash"
+    }
+  ]
+}

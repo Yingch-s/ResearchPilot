@@ -1,0 +1,14 @@
+.env
+runtime.properties
+backend/data/
+frontend/node_modules/
+frontend/dist/
+sidecar/.venv/
+backend/target/
+backend/*.log
+backend/*.err
+backend/*.sse
+backend/last_thread.txt
+sidecar/__pycache__/
+sidecar/*.log
+sidecar/*.json

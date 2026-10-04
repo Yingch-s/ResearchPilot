@@ -1,0 +1,8 @@
+spring:
+  ai:
+    openai:
+      # Test-only placeholder: context creation requires a syntactically present key,
+      # while tests mock model calls and never send this value to a provider.
+      api-key: test-only-placeholder
+      chat:
+        api-key: test-only-placeholder

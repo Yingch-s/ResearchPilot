@@ -1,0 +1,11 @@
+target
+data
+.git
+sidecar
+*.log
+*.sse
+*.json
+!src/main/resources/*.json
+fake_paper.pdf
+final_report*
+matrix.json

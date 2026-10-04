@@ -1,0 +1,3 @@
+<template>
+  <div class="sr-conversation"><div class="sr-thread-label">当前对话 · 依据 2 篇资料</div><article class="sr-message sr-user"><p>这几篇论文的核心方法分别是什么？</p></article><article class="sr-answer"><div class="sr-answer-label">RESEARCHPILOT / 已从资料中找到依据</div><p>DPR 将密集向量检索用于开放域问答，通过独立的编码器把问题和段落映射到同一向量空间，再用内积完成候选检索。相比纯 BM25，它能处理词面不同但语义相近的问题。[<button class="sr-citation">1</button>]</p><p>另一篇研究将图结构引入检索与重排过程，重点改善多跳问题中的证据连接。[<button class="sr-citation">2</button>]</p><div class="sr-answer-foot"><span>引用已定位 · 2 个来源</span><button>查看证据 →</button></div></article><article class="sr-message sr-user"><p>它们的实验设置有什么差异？</p></article></div>
+</template>
