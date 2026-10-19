@@ -1,0 +1,38 @@
+# D1 · b0 · round 1
+
+DPR、ColBERT、ANCE、RocketQA 各论文分别使用什么缓存/消息队列框架部署在线服务？
+
+---
+
+结论先说：**这四篇论文的正文都没有把“缓存/消息队列框架”作为在线服务部署的核心工程细节来交代。** 它们主要报告的是检索模型、训练方法、索引/延迟/吞吐等评测结果，而不是像工业系统论文那样给出完整的服务架构栈。因此，如果问题是“分别使用什么缓存/消息队列框架”，严格按论文内容回答，多数是**未明确说明/无法确认**。
+
+下面逐篇说明。
+
+| 论文 | 在线服务部署中提到的缓存/消息队列框架 | 说明 |
+|---|---|---|
+| **DPR**（Dense Passage Retrieval for Open-Domain Question Answering, EMNLP 2020） | **未明确说明** | 论文主要讲双塔编码器、FAISS 索引、Top-k 检索和 reader 组合。在线服务部分没有交代 Redis、Memcached、Kafka、RabbitMQ 等缓存或消息队列框架。 |
+| **ColBERT**（ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT, SIGIR 2020） | **未明确说明** | 论文重点是 late interaction 架构、MaxSim、倒排/向量索引与延迟评测。没有给出生产级在线服务所用的缓存或消息队列框架。 |
+| **ANCE**（Approximate Nearest Neighbor Negative Contrastive Learning for Dense Text Retrieval, ICLR 2021） | **未明确说明** | 论文核心是 ANCE 负采样训练和异步索引刷新。它提到异步更新索引，但**没有明确说使用哪种消息队列或缓存框架**。 |
+| **RocketQA**（RocketQA: An Optimized Training Approach for Dense Passage Retrieval, NAACL 2021） | **未明确说明** | 论文主要讲去噪负采样、跨批次负采样、数据增强等训练优化。在线部署细节没有涉及缓存/消息队列框架。 |
+
+补充几点，避免误解：
+
+1. **“异步索引更新”不等于“使用了消息队列”。**  
+   ANCE 等论文里可能出现 asynchronous index refresh / asynchronous updating，但这通常指训练过程中索引定期重建或异步刷新，并不说明工程上用了 Kafka、RabbitMQ、Pulsar 等消息队列。
+
+2. **“缓存”在 IR/QA 论文里通常指特征缓存、负样本缓存或索引缓存，不一定是 Redis/Memcached。**  
+   例如 ANCE 会涉及刷新后的索引和负样本，但这和在线服务部署中的分布式缓存框架不是一回事。
+
+3. **这些论文大多来自学术机构或工业研究院，但论文目标不是系统架构披露。**  
+   DPR、ColBERT、ANCE、RocketQA 都不是以“在线服务系统部署”为主线的论文，因此不会像 Facebook、Google、阿里巴巴的系统论文那样详细列出缓存、消息队列、微服务、负载均衡等组件。
+
+4. **如果必须给出“可能相关”的工程线索：**
+   - DPR 官方代码和后续 FAISS 使用中，常见的是 **FAISS 索引 + 内存/GPU 索引**，但没有官方论文说明 Redis/Memcached/Kafka。
+   - ColBERT 后续 ColBERTv2、PLAID 等工程实现会涉及更复杂的索引和压缩，但也不是原论文中的缓存/消息队列框架。
+   - RocketQA 来自百度，百度内部可能有自己的缓存/消息队列基础设施，但**论文没有披露，不能据此认定**。
+
+所以，严格回答你的问题：
+
+> **DPR、ColBERT、ANCE、RocketQA 各论文分别使用什么缓存/消息队列框架部署在线服务？**
+
+答案是：**这四篇论文均未明确说明其在线服务部署所使用的缓存/消息队列框架；无法从论文中确认。** 如果需要在研究中引用，建议写成“论文未披露”或“未涉及”，而不是推断为某个具体框架。

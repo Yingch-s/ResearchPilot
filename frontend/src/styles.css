@@ -1128,3 +1128,6 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); o
   .rp-live .research-title .section-kicker { display: none; }
   .rp-live .research-title { max-width: 35%; font-size: 11px; }
 }
+
+/* P0-A：登录态 chip（topbar 右侧） */
+.login-chip { cursor: pointer; }

@@ -1,0 +1,101 @@
+# A1 · b0 · round 2
+
+DPR、ColBERT、ANCE、RocketQA 四篇论文各自提出的检索/建模核心方法是什么？
+
+---
+
+这四篇工作都属于“稠密检索/神经检索”方向，但各自的核心贡献不同。下面按论文分别说明。
+
+## 1. DPR（Dense Passage Retrieval for Open-Domain Question Answering, 2020）
+
+**核心方法：双塔（dual-encoder）稠密检索。**
+
+- 用两个独立的 BERT 编码器分别把问题和段落编码成向量：
+  - 问题编码器 \(E_Q(q)\)
+  - 段落编码器 \(E_P(p)\)
+- 检索时用向量内积（或余弦相似度）计算相关性：
+  \[
+  \text{sim}(q,p)=E_Q(q)^\top E_P(p)
+  \]
+- 训练目标通常是**对比学习/负采样**：让正例段落的得分高于负例段落。常用 in-batch negatives，即同一个 batch 中其他问题的正例段落作为当前问题的负例。
+- 关键意义：证明只用稠密向量、不依赖 BM25 稀疏匹配，也能在开放域问答检索上取得很强效果，并推动“双塔稠密检索”成为主流范式。
+
+**一句话：DPR 的核心是“双塔 BERT 编码 + 内积相似度 + 负采样对比训练”的稠密段落检索。**
+
+---
+
+## 2. ColBERT（ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT, 2020）
+
+**核心方法：延迟交互（late interaction）与 MaxSim。**
+
+- 不像 DPR 那样把整个问题/段落压成一个向量，ColBERT 保留 token 级上下文表示：
+  - 问题编码为多个 token 向量
+  - 段落编码为多个 token 向量
+- 相关性打分采用 **MaxSim**：
+  - 对问题中每个 token 向量，在段落所有 token 向量中找最大相似度；
+  - 再把这些最大相似度求和。
+  - 直观理解：问题中每个词都能在段落中找到最匹配的词。
+- 为了效率，ColBERT 使用：
+  - BERT 编码后做低维投影；
+  - 离线预计算段落 token 向量并建立索引；
+  - 检索时只做 token 向量间的最大相似度计算。
+- 后续 ColBERTv2 进一步改进压缩和存储效率，但原论文核心是 late interaction + MaxSim。
+
+**一句话：ColBERT 的核心是“保留 token 级向量 + 延迟交互 MaxSim 打分”，在效果和效率之间取得平衡。**
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning for Dense Text Retrieval, 2021）
+
+**核心方法：用近似最近邻（ANN）检索出的“难负例”来训练稠密检索模型。**
+
+- DPR 等早期方法常用 in-batch negatives 或随机负例，这些负例往往太容易，不能很好地区分相关段落和语义相近但不相关的段落。
+- ANCE 的关键观察：
+  - 随着模型更新，整个语料库的向量表示会变化；
+  - 对当前模型来说，最“难”的负例通常来自全局语料中得分较高、但并非正例的段落；
+  - 这些负例可以通过 ANN 索引高效检索出来。
+- 因此 ANCE 提出：
+  - 定期用当前模型重新编码/更新语料索引；
+  - 对每个训练问题，用 ANN 从全库中检索 top-k 段落作为负例；
+  - 用这些“近似最近邻难负例”进行对比训练。
+- 它把**负例采样**从 batch 内扩展到全语料，并让负例随模型训练动态更新。
+
+**一句话：ANCE 的核心是“用 ANN 全库检索动态难负例”来训练稠密检索器，缓解随机/批内负例太简单的问题。**
+
+---
+
+## 4. RocketQA（RocketQA: An Optimized Training Approach for Dense Passage Retrieval, 2021）
+
+**核心方法：面向稠密段落检索的系统化训练优化，主要包含三方面。**
+
+RocketQA 不是单一新模型结构，而是一套训练方法改进，常见概括包括：
+
+1. **跨批次负例（cross-batch negatives）**
+   - 在数据并行训练中，把不同 GPU/批次中的负例也拿来做对比学习，增加负例数量和多样性。
+   - 解决单卡 batch 内负例数量有限的问题。
+
+2. **去噪强负例（denoised hard negatives）**
+   - 自动挖掘的难负例可能其实是正例，只是未被标注。
+   - RocketQA 用教师模型/交叉编码器判断这些“假负例”，过滤掉噪声，避免错误惩罚。
+
+3. **数据增强 / 伪标签（data augmentation）**
+   - 用强检索器或交叉编码器为未标注问题挖掘正例段落，扩充训练数据。
+   - 通过“检索器—交叉编码器—再训练检索器”的迭代方式提升效果。
+
+**一句话：RocketQA 的核心是“跨批次负例 + 去噪难负例 + 伪标签数据增强”的稠密检索训练优化方案。**
+
+---
+
+## 对比总结
+
+| 论文 | 核心方法 | 关键词 |
+|---|---|---|
+| DPR | 双塔 BERT 编码，内积检索，批内负例 | dual-encoder, in-batch negatives |
+| ColBERT | token 级表示 + 延迟交互 MaxSim | late interaction, MaxSim |
+| ANCE | 用 ANN 从全库动态检索难负例 | ANN negatives, hard negatives |
+| RocketQA | 跨批次负例、去噪难负例、伪标签增强 | cross-batch, denoised negatives, data augmentation |
+
+## 不确定说明
+
+- 上述四篇论文的核心思想在领域内比较明确，但具体实验设置、损失函数细节、超参数等，我在这里没有逐一展开；如果需要精确到公式或实验数字，建议直接核对原论文。
+- RocketQA 的贡献在不同综述中有时被归纳为“跨批次负例、去噪负例、数据增强”三点，有时也会强调其“教师-学生/交叉编码器过滤”流程；具体表述可能因综述而异。

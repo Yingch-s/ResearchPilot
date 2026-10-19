@@ -1,0 +1,68 @@
+# C1 · basic · round 2
+
+梳理从 DPR 到 RocketQA 负样本策略的演进主线，覆盖全部四篇论文。
+
+---
+
+# 从 DPR 到 RocketQA 负样本策略的演进主线
+
+## 一、先说明资料覆盖情况
+
+你要求"覆盖全部四篇论文"，但检索到的资料片段**全部来自同一篇论文**（RocketQA，片段中反复出现其标题与三大贡献）。资料中**没有出现 DPR 原文片段，也没有出现另外两篇论文的任何片段**。因此：
+
+- 关于 **RocketQA**：有较充分的资料依据。
+- 关于 **DPR** 以及**其余两篇论文**：资料中未找到直接依据，我只能基于背景知识做有限说明，并明确标注为推测或背景知识，而非资料结论。
+
+下面按"资料中有依据"与"推测/背景知识"分开陈述。
+
+---
+
+## 二、资料中有依据的部分：RocketQA 的负样本策略
+
+根据片段 1、2、3、5，RocketQA 针对 dual-encoder 检索器训练中的三个挑战（训练与推理的差异、未标注正例、训练数据有限），提出三项训练策略，其中与负样本直接相关的有两项，第三项为数据增强：
+
+### 1. Cross-batch negatives（跨批次负样本）
+- 资料原文：RocketQA 引入 cross-batch negatives，"Comparing to in-batch negatives, it increases the number of available negatives for each question during training, and alleviates the discrepancy between training and inference."（片段1）
+- 要点：相比 in-batch negatives，跨批次负样本**增加了每个问题可用的负样本数量**，并**缓解训练与推理之间的差异**。
+
+### 2. Denoised hard negatives（去噪难负样本）
+- 资料原文：RocketQA 引入 denoised hard negatives，"It aims to remove false negatives from the top-ranked results retrieved by a retriever, and derive more reliable hard negatives."（片段1）
+- 要点：从检索器返回的**高排名结果中剔除假负例（false negatives）**，从而得到**更可靠的难负样本**。
+
+### 3. Data augmentation（数据增强，与负样本策略相关但非负样本本身）
+- 资料原文：利用 cross-encoder 为大规模无监督数据生成高质量伪标签，用于训练 dual-encoder（片段1、2）。
+- 要点：cross-encoder 在理论与实践上均被认为强于 dual-encoder，但效率低，故用作"标注器"。
+
+### 4. 实验结论（资料依据）
+- 片段2、5：三项策略在 MSMARCO 与 Natural Questions 上显著超越此前 SOTA，且实验证明三项策略均有效。
+
+---
+
+## 三、资料中未找到的部分：DPR 及另外两篇论文
+
+资料片段中**没有**出现：
+- DPR 的负样本策略（如 in-batch negatives 的具体做法）；
+- 从 DPR 到 RocketQA 之间另外两篇论文的名称、方法或负样本策略；
+- 四篇论文之间的演进关系描述。
+
+因此，**无法基于给定资料梳理"从 DPR 到 RocketQA 覆盖全部四篇论文"的完整主线**。若强行补全，只能依赖外部背景知识，这不符合"不编造"的要求。
+
+---
+
+## 四、基于背景知识的有限推测（明确标注为推测）
+
+以下内容**不是资料中的结论**，仅为帮助理解演进逻辑的推测，请谨慎使用：
+
+- **推测1**：DPR 通常采用 in-batch negatives（同一批次内其他问题的正例作为当前问题的负例）。RocketQA 的 cross-batch negatives 可视为对该策略的扩展——把负样本来源从"单批次内"扩大到"跨批次"，以增加负样本数量。这一推测与片段1中"Comparing to in-batch negatives"的表述方向一致，但资料未直接说明 DPR 使用 in-batch negatives。
+- **推测2**：RocketQA 的 denoised hard negatives 针对的是"难负样本中混有假负例"的问题，这通常是在引入 hard negatives 之后才会出现的副作用。因此演进主线可能是：in-batch negatives → hard negatives → 去噪 hard negatives → 跨批次 + 去噪 + 数据增强。但资料未提供中间两篇论文，无法确认。
+- **推测3**：另外两篇论文可能分别对应"hard negative mining"和"去噪/跨批次"的中间步骤，但资料中**完全未找到**相关名称或内容，属于纯猜测，不建议采信。
+
+---
+
+## 五、结论
+
+1. **有资料依据的结论**：RocketQA 提出 cross-batch negatives、denoised hard negatives、data augmentation 三项策略；前两项直接属于负样本策略；实验证明三项策略有效，并在 MSMARCO 与 NQ 上超越此前 SOTA。
+2. **资料未找到**：DPR 的负样本策略细节、另外两篇论文的任何信息、四篇论文之间的演进关系。
+3. **推测部分**：DPR 可能使用 in-batch negatives，RocketQA 的 cross-batch negatives 是对其的扩展；完整演进主线可能为 in-batch → hard → 去噪 → 跨批次+去噪+增强，但**缺乏资料支撑**。
+
+如果需要覆盖全部四篇论文，建议补充检索 DPR 原文及另外两篇论文的片段，否则无法在"不编造"的前提下完成完整主线梳理。

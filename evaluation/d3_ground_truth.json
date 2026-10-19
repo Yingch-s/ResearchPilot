@@ -1,0 +1,161 @@
+{
+  "verified_at": "2026-10-19",
+  "verified_by": "独立核验员（对照 ES 原文 chunk，索引 rp_chunks_v1，topic_id=e22e83f7-77b4-47fa-aa12-ce8a1ef203b8，4 篇论文共 521 chunks）",
+  "paper_id_map": {
+    "DPR": "fde83aaa-bca4-4194-90b3-a23e12f13af9",
+    "ColBERT": "ab1eb3d8-3cf0-40c4-b013-2232f1ca6afb",
+    "ANCE": "6220422c-c5a2-4edc-8fa2-e5ddba0cb0e6",
+    "RocketQA": "a7d4ec0a-f9a6-40eb-bc77-c8418c15a263"
+  },
+  "tasks": {
+    "A1": {
+      "expected": [
+        "DPR=双编码器+最大内积（点积相似度）",
+        "ColBERT=late interaction+MaxSim",
+        "ANCE=ANN 全局难负例",
+        "RocketQA=跨批负例+去噪+数据增强"
+      ],
+      "revised": false,
+      "evidence": [
+        "DPR sec=3.1 Overview：'DPR applies a different encoder EQ(·)... retrieves k passages of which vectors are the closest to the question vector. We define the similarity... using the dot product of their vectors'（双编码器+点积；run-time 检索即 MIPS）",
+        "ColBERT sec=3.1 Architecture / 3.6：'the MaxSim operations at the backbone of late interaction'（late interaction + MaxSim 证实）",
+        "ANCE sec=4：'ANCE... selects negatives from the entire corpus using an asynchronously updated ANN index'（ANN 全局难负例证实）",
+        "RocketQA sec=1 Introduction：'The proposed RocketQA introduces three novel training strategies... namely cross-batch negatives, denoised hard negatives, and data augmentation'（证实）"
+      ]
+    },
+    "A2": {
+      "expected": [
+        "DPR=NQ/TriviaQA/WQ/CuratedTREC（训练）；SQuAD 仅作评测",
+        "ColBERT=MS MARCO+TREC CAR（修正：原文未使用 SQuAD）",
+        "ANCE=TREC 2019 DL Track（web search）+ NQ/TriviaQA（OpenQA，沿用 DPR 设置）（修正：论文只以 TREC DL 为主基准，MS MARCO 仅附录提及标签来源）",
+        "RocketQA=MSMARCO Passage Ranking + NQ；训练引入人工标注数据 DL 与 cross-encoder 伪标注数据 DU"
+      ],
+      "revised": true,
+      "revision_note": "ColBERT 部分：SQuAD 在全文 0 命中，训练/评测数据为 MS MARCO + TREC CAR（sec=4.1.1）；ANCE 部分：正文基准为 TREC 2019 DL 与 NQ/TQA（sec=5 Experimental Methodologies），'MS MARCO' 仅出现在附录 A.2 与参考文献；RocketQA 部分：评测含 MSMARCO Passage Ranking 与 NQ（sec=4.1.1 / 4.2），且含人工标注 DL（sec=3.4 STEP 4）。DPR 部分证实（NQ/TriviaQA/WQ/TREC，sec=4.2 Question Answering Datasets + 5.1）。",
+      "evidence": [
+        "DPR sec=4.2 Question Answering Datasets：TriviaQA/WebQuestions(WQ) 数据集描述；sec=5.1：'Table 2 compares different passage retrieval systems on five QA datasets... With the exception of SQuAD, DPR performs consistently better than BM25'（SQuAD 属评测集）",
+        "ColBERT sec=4.1.1 Datasets & Metrics：'we conduct our experiments on the MS MARCO Ranking... and TREC Complex Answer Retrieval (TREC-CAR) datasets'；全文查询 'SQuAD' 命中 0",
+        "ANCE sec=5 Experimental Methodologies：'The web search experiments use the TREC 2019 Deep Learning (DL) Track benchmark'；'The OpenQA experiments use the Natural Questions (NQ)... and TriviaQA (TQA)... following the exact settings from Karpukhin et al. (2020)'；'MS MARCO' 仅 sec=A.2 与 References 命中",
+        "RocketQA sec=4.1.1 Datasets：'MSMARCO Passage Ranking... consisting of about 8.8 million passages'；sec=4.2：'we first examine the effectiveness of our retriever on MSMARCO and NQ datasets'；sec=3.4 STEP 4：'train a dual-encoder on both the manually labeled training data DL and the automatically augmented training data DU'"
+      ]
+    },
+    "A3": {
+      "expected": [
+        "DPR=in-batch+BM25 难负例",
+        "ColBERT=(q,d+,d−) 三元组 pairwise softmax 交叉熵训练（修正：原文未报告 BM25 挖掘负例，也未使用蒸馏——'distill' 全文 0 命中）",
+        "ANCE=异步全局难负例（ANN 索引中挖掘）",
+        "RocketQA=跨批负例+去噪难负例（+cross-encoder 数据增强）"
+      ],
+      "revised": true,
+      "revision_note": "仅修正 ColBERT 子项：原预期 'BM25 挖掘+蒸馏' 无原文支撑。原文（sec=3.3 Late Interaction）只描述用三元组 (q, d+, d−) 做 pairwise softmax cross-entropy 训练，未说明负例来自 BM25 挖掘，也没有任何蒸馏（knowledge distillation / cross-encoder teacher）内容（'distill' 0 命中）。DPR/ANCE/RocketQA 子项均证实。",
+      "evidence": [
+        "DPR sec=3.2 Training：'In-batch negatives... S = QPT is a (B × B) matrix of similarity scores... effectively train on B²'；sec=5.2：'adding a single BM25 negative passage improves the result substantially'（in-batch+BM25 难负例证实）",
+        "ColBERT sec=3.3 Late Interaction：'Given a triple ⟨q, d+, d−⟩... optimized via pairwise softmax cross-entropy loss over the computed scores of d+ and d−'；'distill' 全文 0 命中",
+        "ANCE sec=4：'selects negatives from the entire corpus using an asynchronously updated ANN index'（异步全局难负例证实）",
+        "RocketQA sec=3.3 Optimized Training Approach：小节 'Cross-batch Negatives'、'Denoised Hard Negatives'、'Data Augmentation' 三策略齐全（证实）"
+      ]
+    },
+    "A4": {
+      "expected": [
+        "DPR=FAISS 离线建索引（端到端 QA 实验用 HNSW 索引；修正：原文未讨论'精确/近似'两种模式）",
+        "ColBERT=修正：文档表示离线预计算并持久化索引（原文与'免预计算'相反），查询编码在线，端到端检索快",
+        "ANCE=定期（每 m 个 batch）异步刷新 ANN 索引",
+        "RocketQA=修正：多阶段训练流水线（STEP 1–4，类比 multi-stage rocket），dual-encoder 检索 + cross-encoder 去噪/增强"
+      ],
+      "revised": true,
+      "revision_note": "三处修正：① DPR——原文只在 sec=6.1 脚注给出 FAISS HNSW（近似索引）配置，未出现'精确/近似'对比表述（'approximate' 正文 0 命中，'exact search' 0 命中）；② ColBERT——原预期'延迟交互免预计算'与原文直接相反，sec=3.4 明确标题即 'Offline Indexing: Computing & Storing Document Embeddings'，'largely to enable pre-computing document representations offline'，其效率优势是免在线编码文档而非免预计算；③ RocketQA——'two-stage' 在 RocketQA 引言中指 Chen et al. (2017) 的旧两阶段 QA 范式，RocketQA 自身定位是 4 步训练流水线（sec=3.4 'makes an analogy to a multi-stage rocket'）。ANCE 子项证实（'update the ANN index once every m batches'）。",
+      "evidence": [
+        "DPR sec=3.1 Overview：'index them using FAISS... offline'；sec=5.4：'building the FAISS index on 21-million vectors on a single server takes 8.5 hours'；sec=6.1 脚注 10：'FAISS configuration: we used HNSW index type on CPU'",
+        "ColBERT sec=3.4 Offline Indexing: Computing & Storing Document Embeddings：'ColBERT isolates almost all of the computations between queries and documents, largely to enable pre-computing document representations offline'；sec=4.5：'ColBERT can index MS MARCO in about three hours'",
+        "ANCE sec=4 Asynchronous Index Refresh 段：'update the ANN index once every m batches'；sec=3 图 2：异步训练示意（Trainer + Inferencer）",
+        "RocketQA sec=3.4 The Training Procedure：STEP 1–4 流水线；'It makes an analogy to a multi-stage rocket... That is why we call our [model RocketQA]'；'two-stage' 仅在 sec=1 Introduction 引述 Chen et al. (2017) 时出现"
+      ]
+    },
+    "B1": {
+      "expected": [
+        "DPR：训练数据=NQ/TriviaQA/WQ/CuratedTREC；负样本=in-batch + 1~2 个 BM25 难负例（对全 batch 共享）",
+        "ColBERT：训练数据=MS MARCO + TREC CAR；负样本=(q,d+,d−) 三元组 pairwise softmax 交叉熵（来源未明说、无蒸馏）",
+        "ANCE：训练数据=TREC 2019 DL + NQ/TQA；负样本=当前模型从全语料 ANN 检索的全局难负例，异步刷新索引",
+        "RocketQA：训练数据=MSMARCO Passage Ranking + NQ（人工标注 DL + cross-encoder 伪标注 DU）；负样本=跨批负例 + 去噪难负例"
+      ],
+      "revised": true,
+      "revision_note": "B1=A2+A3 合并，继承 A2/A3 的修正（ColBERT 数据集与负例表述、ANCE 基准表述、RocketQA 数据表述）。DPR 子项证实。",
+      "evidence": [
+        "同 A2/A3 各条证据；关键原文：DPR sec=5.2 Table 3 说明（'IB: in-batch training. G.+BM25(1)... 1 or 2 additional BM25 negatives, which serve as negative passages for all questions in the batch'）；ColBERT sec=3.3；ANCE sec=4/5；RocketQA sec=3.3/3.4/4.1.1"
+      ]
+    },
+    "B2": {
+      "expected": [
+        "DPR=有定量：21M 段落编码约 8.8 小时（8 GPUs）、FAISS 索引构建约 8.5 小时（单服务器）、HNSW/CPU 配置",
+        "ColBERT=有定量：单块 Tesla V100 32GiB 测延迟、索引吞吐（MS MARCO 约 3 小时）与空间占用表（embedding 维度 128×4 字节）",
+        "ANCE=有定性：训练主要开销是每次 checkpoint 后全语料重编码；每 5k batch 刷新需约两倍 GPU 分配（Trainer+Inferencer）",
+        "RocketQA=有定量：最多 8× V100 32G（PaddlePaddle/FleetX 分布式 all-gather 实现跨批负例）"
+      ],
+      "revised": false,
+      "evidence": [
+        "DPR sec=5.4 Run-time Efficiency：'Computing dense embeddings on 21-million passages... roughly 8.8 hours on 8 GPUs. However, building the FAISS index on 21-million vectors on a single server takes 8.5 hours'",
+        "ColBERT sec=4.1.3 Hardware & Time Measurements：'a single Tesla V100 GPU that has 32 GiBs of memory'；sec=4.5 Indexing Throughput & Footprint：'ColBERT can index MS MARCO in about three hours'",
+        "ANCE sec=6.1：'In ANCE training, the bulk of computing is to update the encodings of the training corpus using new checkpoints... mitigated by asynchronous index refresh'；A.3：'Refreshing as often as every 5k Batches yields a smooth convergence... but requires twice as many GPU allocation'",
+        "RocketQA sec=4.1.3：'We conduct all experiments... on up to eight NVIDIA Tesla V100 GPUs (with 32G RAM)'；脚注 3：'the cross-batch negative sampling is implemented with differentiable all-gather operation provided in FleetX'"
+      ]
+    },
+    "C1": {
+      "expected": [
+        "演进主线成立：in-batch（DPR/RocketQA 引述为既有技巧）→ BM25 难例（DPR）→ 全局难例 via ANN（ANCE，明确批评 in-batch 局部负例无信息量）→ 跨批+去噪（RocketQA）"
+      ],
+      "revised": false,
+      "evidence": [
+        "DPR sec=3.2：in-batch negatives 技巧引述（'has been used in the full batch setting (Yih et al., 2011)...'）+ sec=5.2 BM25 难例",
+        "ANCE sec=1：'Instead of random or in-batch local negatives, ANCE constructs global negatives using the being-optimized DR model to retrieve from the entire corpus'；Abstract：'the domination of uninformative negatives sampled locally in batch'——构成对 in-batch 路线的明确批评",
+        "RocketQA sec=3.3：'the trick of in-batch negatives has been widely used in previous work (Henderson et al., 2017; Gillick et al., 2019; Wu et al., 2020; Karpukhin et al., 2020; Luan et al., 2020)'，随后提出跨批负例；sec=4.2.2：'it is likely to bring noise if we simply sample hard negatives from the top-retrieved passages... we propose denoised hard negatives by a powerful cross-encoder'——构成对'直接挖难例'路线的批评",
+        "四篇互引关系在 References 中均存在（DPR 引 ANCE 等），演进叙事可由原文直接支撑"
+      ]
+    },
+    "D1": {
+      "expected": ["缓存/消息队列：4 篇均未报告"],
+      "revised": false,
+      "evidence": [
+        "全文（topic 内 521 chunks）match 'cache' 命中 0（DPR/ColBERT/ANCE/RocketQA 各查一次均为 0）",
+        "match_phrase 'message queue' 命中 0"
+      ]
+    },
+    "D2": {
+      "expected": ["操作系统/数据库：4 篇均未报告"],
+      "revised": false,
+      "evidence": [
+        "match_phrase 'operating system' 命中 0",
+        "match_phrase 'database' 命中 0"
+      ]
+    },
+    "D3": {
+      "expected": ["通讯作者大学建校年份：不在论文中（未报告）"],
+      "revised": false,
+      "evidence": [
+        "match_phrase 'founded' 全 topic 命中 0",
+        "4 篇作者机构（照排 chunk）：DPR=Facebook AI/华盛顿大学等；ColBERT=Omar Khattab（麻省理工，署名页）；ANCE=Microsoft；RocketQA=Baidu Inc.（通讯作者 Jing Liu，企业）——论文只出现机构现名，无任何建校年份信息"
+      ]
+    },
+    "E1": {
+      "expected": [
+        "RocketQA 去噪策略定位：sec=3.3 Optimized Training Approach 的 'Denoised Hard Negatives' 子节（方法定义）；sec=4.2.2（效果分析：去噪前约 70% 顶部检索段落实为相关/高度相关）；sec=4.1.3（实现：cross-encoder 分数 <0.1 取负例、>0.9 取正例，人工评估准确率 >90%）"
+      ],
+      "revised": false,
+      "evidence": [
+        "sec=3.3：'Denoised Hard Negatives Although the above strategy can increase the number of negatives, most of negatives are easy ones...'",
+        "sec=4.2.2：'We find that about 70% of them are actually positives or highly relevant. Hence, it is likely to bring noise if we simply sample hard negatives... we propose denoised hard negatives by a powerful cross-encoder'",
+        "sec=4.1.3：'we select the top retrieved passages with scores less than 0.1 as negatives and those with scores higher than 0.9 as positives. We manually evaluated the selected data, and the accuracy was higher than 90%'"
+      ]
+    },
+    "E2": {
+      "expected": [
+        "ANCE 索引刷新机制定位：sec=4 'Asynchronous Index Refresh' 段落（Inferencer 用最新 checkpoint 重算全语料编码、并行重建 ANN 索引、每 m 个 batch 刷新一次，Trainer 用上一版索引 D_{fk-1}/ANN_{fk-1} 继续训练）；机制示意=sec=3 图 2；刷新频率/GPU 分配消融=附录 A.3"
+      ],
+      "revised": false,
+      "evidence": [
+        "sec=4：'we implement an asynchronous index refresh similar to Guu et al. (2020), and update the ANN index once every m batches... an Inferencer that takes the latest checkpoint (e.g., fk) and recomputes the encodings of the entire corpus. In parallel, the Trainer continues its stochastic learning using D_{fk-1} from ANN_{fk-1}'",
+        "sec=3 图 2 说明：'ANCE Asynchronous Training. The Trainer learns the representation using negatives from the ANN index. The Inferencer uses a recent checkpoint to update the representation of documents in the corpus and once finished, refreshes the ANN index'",
+        "A.3 IMPACT OF ASYNCHRONOUS GAP：不同刷新频率（每 5k batch）/学习率对收敛波动与 GPU 分配的影响"
+      ]
+    }
+  }
+}

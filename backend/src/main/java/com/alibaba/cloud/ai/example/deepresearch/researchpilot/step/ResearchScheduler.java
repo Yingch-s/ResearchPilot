@@ -133,6 +133,14 @@ public class ResearchScheduler {
 			logger.warn("Run 已在执行中，拒绝重复启动: {}", runId);
 			return false;
 		}
+		// P0-B 启动守卫：只有 RESEARCHING 才允许进入执行段（补位与取消/停止竞争的最后一道防线，
+		// 也防止 executor 线程池排队窗口内的幽灵执行段——run 已停止但线程随后出队执行）
+		RunStatus currentStatus = runService.currentStatus(runId);
+		if (currentStatus != RunStatus.RESEARCHING) {
+			logger.warn("Run 状态 {} 非 RESEARCHING，拒绝启动: {}", currentStatus, runId);
+			inProcess.remove(runId);
+			return false;
+		}
 		String leaseOwner = workerId + ":" + UUID.randomUUID();
 		if (!runService.acquireLease(runId, leaseOwner, leaseDuration)) {
 			inProcess.remove(runId);
@@ -475,6 +483,8 @@ public class ResearchScheduler {
 				runId.toString(), report, (int) completed, steps.size());
 		// 报告属于发起它的会话：只写入一次，恢复扫描重复收敛时不会制造重复消息。
 		Object sessionId = run.get("session_id");
+		// I2：报告被重收敛覆盖 → 缓存失效
+		com.alibaba.cloud.ai.example.deepresearch.researchpilot.obs.RpReportCache.evict(runId);
 		UUID sessionUuid = null;
 		if (sessionId != null && !String.valueOf(sessionId).isBlank()) {
 			try {

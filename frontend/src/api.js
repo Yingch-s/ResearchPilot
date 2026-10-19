@@ -8,6 +8,10 @@ async function req(method, url, body, signal, raw = false) {
   }
   const r = await fetch(url, opt)
   if (!r.ok) {
+    // P0-A：会话失效 → 通知鉴权层跳登录页（off 模式永不触发）
+    if (r.status === 401 && !url.startsWith('/api/rp/auth/')) {
+      window.dispatchEvent(new CustomEvent('rp:unauthorized'))
+    }
     let detail = null
     try { detail = await r.json() } catch {}
     const error = new Error(detail?.message || detail?.error || `${method} ${url} → ${r.status}`)

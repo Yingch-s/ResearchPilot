@@ -1,0 +1,55 @@
+# A1 · basic · round 1
+
+DPR、ColBERT、ANCE、RocketQA 四篇论文各自提出的检索/建模核心方法是什么？
+
+---
+
+根据提供的资料片段，我可以回答如下：
+
+## RocketQA
+
+**有资料依据的结论：**
+
+RocketQA 是一种用于改进稠密段落检索（dense passage retrieval）的优化训练方法，主要针对开放域问答（open-domain QA）。它采用 dual-encoder（双编码器）架构来学习问题和段落的稠密表示以进行语义匹配。
+
+RocketQA 提出三项主要技术贡献：
+
+1. **Cross-batch negatives（跨批次负样本）**：相比 in-batch negatives，它在训练时增加了每个问题可用的负样本数量，并缓解了训练与推理之间的差异（discrepancy）。
+2. **Denoised hard negatives（去噪难负样本）**：旨在从检索器返回的 top-ranked 结果中移除假负样本（false negatives），从而获得更可靠的难负样本。
+3. **Data augmentation（数据增强）**：利用 cross-encoder 对大规模无监督数据生成高质量的伪标签，用于训练 dual-encoder 检索器。资料指出 cross-encoder 架构在理论和实践中都比 dual-encoder 更强，但效率较低，因此用它来生成伪标签。
+
+实验表明 RocketQA 在 MSMARCO 和 Natural Questions 上显著优于此前的最先进模型，并能提升端到端问答的性能。
+
+---
+
+## DPR、ColBERT、ANCE
+
+**资料中有依据的结论：**
+
+资料片段中仅在片段3中简要提及了 DPR 和 ANCE：
+
+- **DPR**（Karpukhin et al., 2020）：属于稠密段落检索器（dense passage retriever）。资料提到 DPR 和 ME-BERT 都使用 in-batch 随机采样以及从 BM25 检索结果中进行难负样本采样（hard negative sampling from the results retrieved by BM25）。
+- **ANCE**（Xiong et al., 2020）：也属于稠密段落检索器。资料提到 ANCE 通过使用稠密检索器（dense retriever）来增强难负样本采样（enhances the hard negative sampling by using the dense retriever）。
+
+**资料中未找到的信息：**
+
+- 关于 **ColBERT** 的核心方法，提供的资料片段中**完全没有提及**，因此无法根据现有资料说明其检索/建模核心方法。
+- 关于 DPR 和 ANCE 的核心方法，资料仅提供了上述简要描述（DPR 使用 in-batch 随机采样 + BM25 难负样本；ANCE 使用稠密检索器增强难负样本采样），**没有更详细的建模细节**（如 DPR 的双编码器具体设计、ANCE 的完整训练流程等）。
+
+**我的推测（非资料依据）：**
+
+- 根据片段3的上下文，DPR 和 ANCE 都属于 dual-encoder 稠密检索范式，但这只是从"dense passage retriever"这一分类中推断的，资料并未明确说明 DPR 和 ANCE 的具体架构细节。
+- ColBERT 的核心方法（如 late interaction 等）在资料中无任何依据，我不能编造。
+
+---
+
+## 总结
+
+| 论文 | 核心方法（资料依据） |
+|------|---------------------|
+| DPR | 稠密段落检索器；使用 in-batch 随机采样 + 从 BM25 结果中采样难负样本（资料仅此简要描述） |
+| ColBERT | **资料中未找到** |
+| ANCE | 稠密段落检索器；使用稠密检索器增强难负样本采样（资料仅此简要描述） |
+| RocketQA | 优化 dual-encoder 训练：cross-batch negatives、denoised hard negatives、data augmentation（cross-encoder 生成伪标签） |
+
+如需 DPR、ColBERT、ANCE 更完整的核心方法说明，建议补充检索这三篇论文的原文资料。

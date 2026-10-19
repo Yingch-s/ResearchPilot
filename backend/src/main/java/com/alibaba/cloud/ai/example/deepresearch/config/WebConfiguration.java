@@ -16,7 +16,6 @@
 
 package com.alibaba.cloud.ai.example.deepresearch.config;
 
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -26,8 +25,10 @@ import org.springframework.web.filter.CorsFilter;
 @Configuration
 public class WebConfiguration {
 
+	// P0-A：CorsFilter 以原生类型暴露（Security 自动配置要求同名 bean 为 CorsFilter 类型），
+	// 注册包装拆分为独立 bean，CORS 行为不变
 	@Bean
-	public FilterRegistrationBean<CorsFilter> corsFilter() {
+	public CorsFilter corsFilter() {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowCredentials(false);
 		configuration.addAllowedOrigin("*");
@@ -36,7 +37,13 @@ public class WebConfiguration {
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
-		return new FilterRegistrationBean<>(new CorsFilter(source));
+		return new CorsFilter(source);
+	}
+
+	@Bean
+	public org.springframework.boot.web.servlet.FilterRegistrationBean<CorsFilter> corsFilterRegistration(
+			CorsFilter corsFilter) {
+		return new org.springframework.boot.web.servlet.FilterRegistrationBean<>(corsFilter);
 	}
 
 }

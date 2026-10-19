@@ -1,0 +1,49 @@
+# D1 · basic · round 2
+
+DPR、ColBERT、ANCE、RocketQA 各论文分别使用什么缓存/消息队列框架部署在线服务？
+
+---
+
+# 关于 DPR、ColBERT、ANCE、RocketQA 在线服务部署所用缓存/消息队列框架的说明
+
+## 结论先行
+
+**在提供的资料片段中，未找到任何关于 DPR、ColBERT、ANCE、RocketQA 这四篇论文使用何种缓存（cache）或消息队列（message queue）框架来部署在线服务的信息。**
+
+## 逐篇说明
+
+| 论文 | 资料中是否有部署框架信息 | 说明 |
+|------|--------------------------|------|
+| **DPR** (Karpukhin et al., 2020) | ❌ 未找到 | 片段中仅在对比实验里提到 DPR 使用 BERT_base 预训练模型、使用 in-batch 随机采样和 BM25 硬负采样，未涉及任何缓存/消息队列框架。 |
+| **ColBERT** | ❌ 未找到 | 提供的所有片段中**完全没有出现 ColBERT 相关内容**，无法给出任何依据。 |
+| **ANCE** (Xiong et al., 2020) | ❌ 未找到 | 片段中仅提到 ANCE 使用 RoBERTa_base、用 BM25 负样本预热、在 OpenQA 中用 DPR checkpoint 预热，未涉及部署框架。 |
+| **RocketQA** | ❌ 未找到 | 片段仅介绍其三项训练策略（cross-batch negatives、denoised hard negatives、data augmentation）及预训练模型对比，未涉及在线服务部署。 |
+
+## 资料中有依据的相关信息（仅限训练/模型层面）
+
+以下是从片段中能确认的、与这四篇论文相关的事实，但**均与缓存/消息队列无关**：
+
+- **DPR**：使用 BERT_base；采用 in-batch 随机采样 + BM25 硬负采样（片段2、片段4）。
+- **ANCE**：使用 RoBERTa_base；用 BM25 负样本预热；在 OpenQA 中用 DPR checkpoint 预热（片段2、片段3）。
+- **RocketQA**：主要使用 ERNIE_base；提出 cross-batch negatives、denoised hard negatives、data augmentation 三种训练策略（片段1、片段2、片段5）。
+- **ColBERT**：资料中未出现。
+
+## 推测部分（明确标注为推测）
+
+如果问题背景是这些系统在实际工业级在线服务中的部署，那么：
+
+- **推测**：DPR 的官方开源实现（facebookresearch/DPR）通常以 FAISS 做向量索引，在线服务常用简单的 Python 服务框架（如 Flask/FastAPI）暴露接口，但**这不等于论文中描述了缓存或消息队列框架**。
+- **推测**：RocketQA 由百度提出，工业部署可能涉及百度内部的服务框架，但**资料中没有任何依据**。
+- **推测**：ColBERT/ColBERTv2 的官方实现常配合 PLAID 索引，但同样**资料中无依据**。
+
+以上推测均**不能作为论文事实引用**。
+
+## 建议
+
+若需确认这四篇论文在线服务实际使用的缓存/消息队列框架，建议：
+
+1. 直接查阅各论文的 **Implementation / Deployment / System** 章节（提供的片段未覆盖这些部分）；
+2. 查阅各论文对应的**官方开源代码仓库**的 README 或部署文档；
+3. 查阅作者后续的系统性论文（如 RocketQA 后续的工业部署论文）。
+
+在现有资料范围内，**无法回答该问题**。

@@ -1,0 +1,9 @@
+[
+  {"id":"positive-1","claim":"DPR采用双编码器架构，训练时使用批内负样本提升效率。","excerpt":"Dense Passage Retrieval uses a dual-encoder architecture and in-batch negatives improve training efficiency.","label":"SUPPORTED"},
+  {"id":"positive-2","claim":"该方法通过批内负样本提高训练效率。","excerpt":"In-batch negatives are used during training to improve efficiency.","label":"SUPPORTED"},
+  {"id":"positive-3","claim":"模型在低资源场景下仍能提升检索效果。","excerpt":"The model improves retrieval effectiveness in low-resource settings.","label":"SUPPORTED"},
+  {"id":"contradiction-1","claim":"DPR采用双编码器架构。","excerpt":"DPR uses a cross-encoder architecture rather than a dual encoder.","label":"CONTRADICTED"},
+  {"id":"contradiction-2","claim":"该方法提升了训练效率。","excerpt":"The additional negative sampling reduces training efficiency.","label":"CONTRADICTED"},
+  {"id":"unrelated-1","claim":"DPR采用双编码器架构。","excerpt":"The weather forecast predicts rain tomorrow.","label":"INSUFFICIENT"},
+  {"id":"unrelated-2","claim":"模型提升低资源检索效果。","excerpt":"The paper describes an unrelated image classification benchmark.","label":"INSUFFICIENT"}
+]

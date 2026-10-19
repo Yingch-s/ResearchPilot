@@ -1,0 +1,85 @@
+# B2 · basic · round 1
+
+DPR、ColBERT、ANCE、RocketQA 各自报告了怎样的资源需求（算力、索引体积的定性描述）？
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 的资源需求对比
+
+## 说明
+
+以下分析严格基于所提供的 5 个资料片段。需要先指出：**这些片段主要讨论的是方法设计与效果对比，几乎没有直接给出算力或索引体积的定量/定性描述**。因此，很多内容只能标注为"未找到"或"推测"。
+
+---
+
+## 1. DPR（Karpukhin et al., 2020）
+
+**资料中有依据的结论：**
+- 片段2提到 DPR 属于 dense passage retriever，使用 **in-batch random sampling** 以及 **从 BM25 检索结果中采样的 hard negative sampling**。
+- 片段3提到 OpenQA 实验"following the exact settings from Karpukhin et al. (2020)"，说明 DPR 是后续工作（ANCE）的基线设置来源。
+- 片段4提到 ANCE 在 passage retrieval 上优于 DPR。
+
+**关于资源需求：**
+- 资料中**未找到** DPR 的算力需求（如 GPU 数量、训练时长）或索引体积的任何描述。
+- 可推测（**推测**）：作为双塔（dual-encoder）稠密检索器，DPR 需要为每个 passage 预计算一个向量并建立向量索引，索引体积与语料规模成正比；但资料未提供具体数字。
+
+---
+
+## 2. ColBERT（Khattab & Zaharia）
+
+**资料中有依据的结论：**
+- 片段5指出 ColBERT 基于 **contextualized late interaction over BERT**。
+- 核心机制：query 和 document **分别编码为两组 contextual embeddings**，然后用"cheap and pruning-friendly computations"计算相关性，从而**避免对每个候选做穷尽评估**（"ranking without exhaustively evaluating every possible candidate"）。
+- 设计目标是"reconcile efficiency and contextualization in IR"。
+
+**关于资源需求：**
+- 资料中**未找到** ColBERT 的算力或索引体积的定量描述。
+- 可推测（**推测**）：由于每个文档被编码为**多个 token 级向量**（而非单个向量），其索引体积通常显著大于单向量稠密检索器（如 DPR）；但片段5只强调其计算"cheap and pruning-friendly"，并未给出索引体积的定性说明。这一点属于基于 late interaction 机制的合理推断，**非资料原文**。
+
+---
+
+## 3. ANCE（Xiong et al., 2020）
+
+**资料中有依据的结论：**
+- 片段2：ANCE 通过**使用稠密检索器本身来增强 hard negative sampling**（"enhances the hard negative sampling by using the dense retriever"），区别于 DPR/ME-BERT 从 BM25 结果采样。
+- 片段4：ANCE 在 TREC 2019 DL 上显著优于所有稀疏检索方法；是唯一使 BERT-Siamese 稳健超过稀疏方法的负样本构造机制；在 OpenQA passage retrieval 上优于 DPR；在真实生产环境中约有 **15% relative gains**。
+- 片段3：ANCE 的更好检索能传播到更好的答案准确率（用 RAG-Token 和 DPR Reader 验证）。
+
+**关于资源需求：**
+- 资料中**未找到** ANCE 的算力或索引体积描述。
+- 可推测（**推测**）：ANCE 需要在训练过程中**周期性用当前稠密检索器重新检索并刷新 hard negatives**，这通常意味着比 DPR 更高的训练算力开销（需要反复建索引/检索）；但片段中**没有直接依据**，仅为机制推断。
+
+---
+
+## 4. RocketQA（Qu et al.）
+
+**资料中有依据的结论：**
+- 片段1：RocketQA 提出三种新训练策略改进开放域 QA 的稠密段落检索：
+  1. **cross-batch negatives**
+  2. **denoised hard negatives**
+  3. **data augmentation**
+- 片段2：RocketQA 与 DPR、ME-BERT、ANCE 等稠密检索器以及 BM25、doc2query、DeepCT、docTTTTTquery、GAR 等稀疏检索器进行对比。
+
+**关于资源需求：**
+- 资料中**未找到** RocketQA 的算力或索引体积描述。
+- 可推测（**推测**）：cross-batch negatives 通常需要**跨多个 batch 聚合负样本**，可能增加显存/通信开销；data augmentation 可能增加训练数据量与训练成本。但这些均为基于方法名称的推断，**片段中无直接依据**。
+
+---
+
+## 汇总表
+
+| 方法 | 算力需求（资料依据） | 索引体积（资料依据） |
+|---|---|---|
+| DPR | 未找到 | 未找到 |
+| ColBERT | 未找到（仅提及计算"cheap and pruning-friendly"） | 未找到 |
+| ANCE | 未找到 | 未找到 |
+| RocketQA | 未找到 | 未找到 |
+
+---
+
+## 结论
+
+1. **所提供的 5 个片段均未直接报告 DPR、ColBERT、ANCE、RocketQA 的算力需求或索引体积的定性/定量描述。**
+2. 片段中能确认的仅是各方法的**训练策略/检索机制**（如 DPR 的 in-batch + BM25 hard negatives、ANCE 的稠密检索器自举 hard negatives、ColBERT 的 late interaction、RocketQA 的三种训练策略），以及 ANCE 相对 DPR 的效果优势。
+3. 关于资源需求的任何具体说法，若超出上述机制描述，均属于**推测**，不应作为资料结论引用。
+4. 若需要这些方法的资源需求数据，建议查阅各论文原文的实验设置章节（如训练硬件、索引规模、延迟指标），这些内容**不在本次检索到的片段中**。

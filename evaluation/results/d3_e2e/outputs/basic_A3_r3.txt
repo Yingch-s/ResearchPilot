@@ -1,0 +1,116 @@
+# A3 · basic · round 3
+
+DPR、ColBERT、ANCE、RocketQA 各自的负样本（hard negative）策略是什么？
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 的负样本（hard negative）策略
+
+## 一、先说明资料覆盖情况
+
+本次检索到的资料片段只涉及 **ANCE** 和 **RocketQA** 两个对象，**没有检索到关于 DPR 和 ColBERT 负样本策略的直接资料**。因此下面分两部分回答：
+
+- **有资料依据的部分**：ANCE、RocketQA（以及片段中顺带提到的 DPR 相关线索）。
+- **资料未覆盖的部分**：DPR、ColBERT 的具体 hard negative 策略——按您的要求，不编造，直接说明未找到。
+
+---
+
+## 二、有资料依据的结论
+
+### 1. ANCE（Approximate nearest neighbor Negative Contrastive Estimation）
+
+**依据片段 2、3、5：**
+
+- **核心策略：全局负样本（global negatives），而非随机负样本或 in-batch 局部负样本。**
+  - 片段 2 明确指出："Instead of random or in-batch local negatives, ANCE constructs global negatives using the being-optimized DR model to retrieve from the entire corpus."
+  - 即 ANCE 不使用随机负样本，也不使用 batch 内的局部负样本，而是用**正在被优化的稠密检索模型（DR model）**从**整个语料库**中检索，构造全局负样本。
+
+- **实现方式：异步更新的 ANN 索引。**
+  - 片段 3："selects hard training negatives globally from the entire corpus, using an asynchronously updated ANN index."
+  - 即通过一个**异步更新的近似最近邻（ANN）索引**，从全语料中选出 hard training negatives。
+
+- **动机（为什么这样做）：**
+  - 片段 3 指出，稠密检索的学习瓶颈来自"in-batch 局部采样的无信息负样本（uninformative negatives sampled locally in batch）"，它们导致梯度范数衰减、随机梯度方差大、收敛慢。
+  - 片段 2 也强调，ANCE 让**训练时负样本的分布**与**推理时需要区分的无关文档分布**对齐（"fundamentally aligns the distribution of negative samples in training and of irrelevant documents to separate in..."）。
+
+- **补充细节（片段 5）：**
+  - 在 TREC DL 实验中，ANCE 会先用 BM25 negatives 做 "BM25 Warm Up"（BM25 → ∗）。
+  - 在 OpenQA 实验中，ANCE 使用已发布的 **DPR checkpoints** 做 warm up。
+
+> 小结（有依据）：ANCE 的 hard negative 策略 = **用当前正在训练的 DR 模型 + 异步更新的 ANN 索引，从全语料中检索出全局 hard negatives**，替代随机/in-batch 负样本。
+
+---
+
+### 2. RocketQA
+
+**依据片段 1、4：**
+
+RocketQA 提出了三种训练策略，其中与负样本直接相关的是前两种：
+
+- **策略一：Cross-batch negatives（跨批次负样本）。**
+  - 片段 4："RocketQA introduces cross-batch negatives. Comparing to in-batch negatives, it increases the number of available negatives for each question during training, and alleviates the discrepancy between training and inference."
+  - 即相比 in-batch negatives，跨批次负样本**增加了每个问题在训练时可用的负样本数量**，并**缓解训练与推理之间的差异**。
+
+- **策略二：Denoised hard negatives（去噪 hard negatives）。**
+  - 片段 4："RocketQA introduces denoised hard negatives. It aims to remove false negatives from the top-ranked results retrieved by a retriever, and derive more reliable hard negatives."
+  - 即从检索器返回的**top-ranked 结果中去除 false negatives（假负例）**，从而得到**更可靠的 hard negatives**。
+  - 这一点很关键：RocketQA 的 hard negative 不是简单取 top-ranked 文档，而是先做**去噪**处理。
+
+- **策略三（与负样本间接相关）：Data augmentation（数据增强）。**
+  - 片段 4：利用 **cross-encoder** 为大规模无监督数据生成高质量伪标签，用于训练 dual-encoder retriever。
+  - 这本身不是负样本策略，但会间接影响训练数据的正/负样本构成。
+
+> 小结（有依据）：RocketQA 的负样本策略 = **cross-batch negatives（扩大负样本数量）+ denoised hard negatives（对 top-ranked 结果去噪，去除假负例）**，并辅以 cross-encoder 伪标签的数据增强。
+
+---
+
+### 3. 片段中顺带提到的 DPR 线索
+
+**依据片段 5：**
+
+- 片段 5 提到："BM25 negatives can help train dense retrieval (Karpukhin et al., 2020; Luan et al., 2020)"，其中 Karpukhin et al., 2020 通常对应 DPR 论文。
+- 这暗示 **DPR 使用了 BM25 negatives 来训练稠密检索**。
+- 但需要注意：这只是片段 5 对他人工作的**转述**，并非 DPR 论文原文，且片段没有给出 DPR 负样本策略的完整细节（例如是否使用 hard negative、如何挖掘等）。
+
+> 小结（有依据但有限）：资料间接提示 DPR 使用过 **BM25 negatives**；但 DPR 完整的 hard negative 策略在本次资料中**未找到**。
+
+---
+
+## 三、资料未覆盖、无法回答的部分
+
+以下内容在本次检索到的片段中**没有找到依据**，按您的要求不做编造：
+
+1. **DPR 的完整 hard negative 策略**：
+   - 资料仅间接提到 BM25 negatives，未说明 DPR 是否/如何挖掘 hard negatives（例如是否用 top-k 检索结果、是否用 gold passage 之外的难负例等）。
+   - **未找到**。
+
+2. **ColBERT 的负样本策略**：
+   - 本次资料片段中**完全没有出现 ColBERT** 相关内容。
+   - **未找到**。
+
+3. **ANCE 与 RocketQA 负样本策略的对比细节**（如去噪具体方法、cross-batch 的具体实现）：
+   - 片段只给出高层描述，**未找到**更细粒度的实现细节。
+
+---
+
+## 四、汇总表
+
+| 对象 | 负样本策略（有依据部分） | 资料依据 |
+|---|---|---|
+| **DPR** | 资料仅间接提示使用 BM25 negatives；完整 hard negative 策略未找到 | 片段 5（转述） |
+| **ColBERT** | 未找到 | 无 |
+| **ANCE** | 用正在优化的 DR 模型 + 异步更新 ANN 索引，从全语料检索全局 hard negatives；替代随机/in-batch 负样本；可用 BM25 或 DPR checkpoint 做 warm up | 片段 2、3、5 |
+| **RocketQA** | cross-batch negatives（扩大负样本数量）+ denoised hard negatives（对 top-ranked 结果去噪、去假负例）；辅以 cross-encoder 伪标签数据增强 | 片段 1、4 |
+
+---
+
+## 五、推测部分（明确标注）
+
+以下为**我的推测**，非资料直接依据，仅供参考：
+
+- 推测 DPR 可能采用"BM25 top-k 作为 hard negatives"或"in-batch negatives + BM25 negatives"的组合，因为片段 5 提到 BM25 negatives 有助于训练稠密检索，且 DPR 原文（Karpukhin et al., 2020）常被引用为使用 BM25 negatives 的工作。**但本次资料未证实，需查 DPR 原文确认。**
+- 推测 ColBERT 可能使用 in-batch negatives 或类似 late-interaction 训练中的负采样策略，但**本次资料完全未涉及，不能作为结论**。
+
+---
+
+**结论**：本次资料能明确支撑的是 **ANCE 的全局 ANN hard negatives** 和 **RocketQA 的 cross-batch + denoised hard negatives**；DPR 仅有 BM25 negatives 的间接线索；ColBERT 完全未找到。建议补充检索 DPR（Karpukhin et al., 2020）和 ColBERT（Khattab & Zaharia, 2020）原文以补全。

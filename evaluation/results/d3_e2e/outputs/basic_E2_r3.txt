@@ -1,0 +1,51 @@
+# E2 · basic · round 3
+
+ANCE 如何刷新全局难负例所用的 ANN 索引？
+
+---
+
+# ANCE 如何刷新全局难负例所用的 ANN 索引？
+
+## 一、核心机制（资料中有依据的结论）
+
+根据片段1、片段2和片段5，ANCE 刷新 ANN 索引的机制可以概括为**异步更新（asynchronous update）**，具体流程如下：
+
+1. **维护一个 Inferencer（推理器）**：与训练过程并行运行，使用当前正在优化的 DR（dense retrieval）模型的一个**近期 checkpoint**，对**整个语料库**中的文档进行编码（document encodings）。这一点与 Guu et al. (2020) 的做法类似（片段1）。
+
+2. **异步刷新 ANN 索引**：当 Inferencer 完成对整个语料库的编码后，就用这些新的文档表示**重建 ANN 索引**，用于后续的负例采样，从而"跟上"模型训练的进度（片段1）。
+
+3. **为什么必须异步**：片段5明确指出，保持 ANN 索引实时更新是困难的，因为索引更新包含两个操作：
+   - **Inference（推理）**：用更新后的 DR 模型重新计算语料库中所有文档的表示；
+   - **Index（建索引）**：用更新后的表示重建 ANN 索引。
+   
+   其中 Index 操作本身是高效的（Johnson et al., 2019），但 Inference 需要对整个语料库做一次前向传播，语料库远大于训练 batch，因此**无法每个 batch 都做一次**，只能异步进行。
+
+## 二、具体实现细节（资料中有依据的结论）
+
+片段3给出了 ANCE 实验中的具体配置：
+
+- **ANN 索引类型**：使用 Faiss 的 `IndexFlatIP`（内积索引，Johnson et al., 2019）。
+- **刷新频率**：**每 10k 个训练 batch 刷新一次索引**（index refreshing per 10k training batches）。
+- **GPU 分配**：采用 1:1 的 Trainer:Inference GPU 分配（即训练与推理各占一半 GPU）。
+- **负例采样方式**：对每个正例，从 ANN 返回的 **top 200** 中**均匀采样一个负例**。
+- **其他训练设置**：batch size 8，梯度累积步数 2，使用 4 块 GPU。
+- **长文档处理**：采用 Dai & Callan (2019b) 的 FirstP（取文档前 512 token）和 MaxP（文档切分为最多 4 个 512-token 段落，段落分数做 max-pooling）两种设置；其中 **max-pooling 操作在 ANN 中原生支持**。
+
+## 三、机制的目的（资料中有依据的结论）
+
+片段2和片段4指出，ANCE 使用**异步更新的 ANN 索引**从**整个语料库**中全局选择难负例（global negatives），而不是使用 batch 内的局部负例（local/in-batch negatives）。这样做的理论依据是：局部负例信息量低，会导致梯度范数递减、随机梯度方差大、收敛慢；而全局难负例的梯度范数远大于局部负例，从而改善稠密检索模型的收敛（片段1、片段2）。
+
+## 四、资料中未找到的信息
+
+以下内容在提供的片段中**未找到**，不做推测：
+
+- Inferencer 具体如何与 Trainer 同步 checkpoint 的细节（例如 checkpoint 交换频率、通信方式）。
+- 索引刷新时是否采用增量更新还是完全重建（片段5只提到"rebuild the ANN index"，但未说明是否每次全量重建）。
+- 10k batch 这一刷新频率是如何选定的、是否有消融实验。
+- 除 Faiss IndexFlatIP 外是否还尝试过其他 ANN 索引结构。
+- 异步刷新过程中训练与索引不一致（stale index）对收敛的具体影响分析。
+
+## 五、我的推测（明确标注为推测）
+
+- **推测**：片段5说"Inference is too expensive to compute per batch"，而片段3给出"每 10k batch 刷新一次"，可以合理推测 10k 这个数字是在"索引新鲜度"与"推理开销"之间做的折中——刷新太频繁则推理成本过高，太稀疏则负例分布与当前模型偏差过大。但资料中并未明确说明这一权衡过程，故仅为推测。
+- **推测**：片段1提到 Inferencer 使用"a recent checkpoint"，暗示训练侧与推理侧并非严格同步，可能存在若干 step 的滞后；但具体滞后多少、如何选取 checkpoint，资料未说明。

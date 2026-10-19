@@ -72,6 +72,10 @@ public class ResearchStepExecutor implements StepExecutor {
 	/** Discovery results are never formal evidence until the linked page is fetched. */
 	private final WebSourceFetcher webFetcher;
 
+	// I5：可选注入（测试兼容构造器不提供时为 null，跳过指标）
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private com.alibaba.cloud.ai.example.deepresearch.researchpilot.usage.LlmUsageRecorder usageRecorder;
+
 	// H2.2：请求级超时（LLM 请求自身可执行的超时，不再只靠外层 Deadline 判断）
 	private final Duration llmRequestTimeout;
 
@@ -359,6 +363,11 @@ public class ResearchStepExecutor implements StepExecutor {
 		detail.put("completion_tokens", completionTokens);
 		events.log(ctx.runId(), ctx.stepId(), ctx.attemptId(), RpEventType.LLM_CALL_COMPLETED, "ResearchStepExecutor",
 				null, detail);
+		// I5：研究段 token 计入 Micrometer（此前只有 planning/ask——研究段是消耗主体）
+		if (usageRecorder != null) {
+			usageRecorder.record(kind, detail.get("duration_ms") instanceof Long d ? d : 0L, promptTokens,
+					completionTokens, true, null);
+		}
 	}
 
 	/**

@@ -1,0 +1,102 @@
+# B1 · basic · round 3
+
+对比 DPR、ColBERT、ANCE、RocketQA 的训练配置全貌：训练数据、负样本策略、蒸馏/数据增强。
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 训练配置对比
+
+## 重要说明
+
+以下回答基于提供的资料片段。**资料片段仅覆盖了 RocketQA 的详细训练策略，以及少量关于 DPR、ANCE 的间接信息（如预训练模型、BM25 warm-up 等）。关于 ColBERT 的训练配置，资料中完全未提及。** 因此，我将严格区分"有依据的结论"与"未找到的信息"，不做编造。
+
+---
+
+## 一、RocketQA（资料最充分）
+
+### 1. 训练数据
+- **有依据**：RocketQA 使用大规模无监督数据，由 cross-encoder 生成伪标签（pseudo labels）用于数据增强（片段2、片段3）。
+- **有依据**：在 TREC DL 实验中，使用 MARCO passage 训练标签，并采用 "BM25 Warm Up" 设置（BM25 → ∗），即先用 MARCO 官方 BM25 负样本训练（片段1）。
+- **有依据**：主要使用 ERNIEbase 作为预训练语言模型；也实验过 BERTbase，性能略降（片段4）。
+
+### 2. 负样本策略
+- **有依据**：三大核心策略之一为 **cross-batch negatives**（跨批次负样本），相比 in-batch negatives 增加了每个问题的可用负样本数量，并缓解训练与推理之间的差异（片段2、片段3）。
+- **有依据**：第二大策略为 **denoised hard negatives**（去噪硬负样本），目的是从 retriever 检索到的 top-ranked 结果中移除假负样本（false negatives），从而获得更可靠的硬负样本（片段2、片段3）。
+- **有依据**：在 TREC DL 中，DR 模型先用 MARCO 官方 BM25 负样本进行 warm-up（片段1）。
+
+### 3. 蒸馏/数据增强
+- **有依据**：第三大策略为 **data augmentation**，利用 cross-encoder 为无标签数据生成高质量伪标签，再用于训练 dual-encoder retriever。理由是 cross-encoder 在理论和实践中都比 dual-encoder 更强，但效率低，因此用其"标注"数据来增强 dual-encoder 的训练（片段2、片段3）。
+- **有依据**：这本质上是一种 cross-encoder → dual-encoder 的知识蒸馏/伪标签蒸馏思路（片段2 明确提到 cross-encoder 生成 pseudo labels 用于训练 dual-encoder）。
+
+---
+
+## 二、DPR（资料有限）
+
+### 1. 训练数据
+- **有依据**：片段1提到 DPR 使用 MARCO passage 训练标签，且 BM25 negatives 可帮助训练 dense retrieval（Karpukhin et al., 2020; Luan et al., 2020）。
+- **有依据**：片段4指出 DPR 使用 **BERTbase** 作为预训练语言模型。
+- **未找到**：DPR 具体的训练数据集规模、是否使用 NQ 等具体数据集的细节，资料中未提供。
+
+### 2. 负样本策略
+- **有依据**：片段1暗示 DPR 使用 BM25 negatives 来训练 dense retrieval（作为 warm-up 或负样本来源之一）。
+- **有依据**：片段1提到 ANCE 在 OpenQA 中用 released DPR checkpoints 进行 warm-up，说明 DPR 的 checkpoint 被后续工作复用。
+- **未找到**：DPR 的 in-batch negatives 具体配置、hard negatives 挖掘策略等，资料中未详细说明。
+
+### 3. 蒸馏/数据增强
+- **未找到**：资料中未提及 DPR 使用蒸馏或数据增强策略。
+
+---
+
+## 三、ANCE（资料有限）
+
+### 1. 训练数据
+- **有依据**：片段1提到 ANCE 也通过 BM25 negatives 进行 warm-up。
+- **有依据**：片段1提到在 OpenQA 中，ANCE 使用 released DPR checkpoints 进行 warm-up。
+- **有依据**：片段4指出 ANCE 使用 **RoBERTabase** 作为预训练语言模型。
+- **未找到**：ANCE 的具体训练数据集、数据规模等，资料中未提供。
+
+### 2. 负样本策略
+- **有依据**：ANCE 的核心特点是使用 **BM25 negatives 进行 warm-up**（片段1）。
+- **有依据**：片段1提到 ANCE 在 TREC DL 中也被 BM25 negatives warm up。
+- **未找到**：ANCE 的异步更新索引、硬负样本挖掘的具体机制，资料中未详细说明（虽然 ANCE 原论文以"近似最近邻负样本"著称，但资料片段未提及）。
+
+### 3. 蒸馏/数据增强
+- **未找到**：资料中未提及 ANCE 使用蒸馏或数据增强策略。
+
+---
+
+## 四、ColBERT（资料完全缺失）
+
+- **未找到**：提供的资料片段中**完全没有提及 ColBERT** 的任何训练配置信息，包括训练数据、负样本策略、蒸馏/数据增强。
+- 因此，无法基于现有资料对 ColBERT 进行任何有依据的说明。
+
+---
+
+## 五、汇总对比表
+
+| 维度 | DPR | ColBERT | ANCE | RocketQA |
+|------|-----|---------|------|----------|
+| **训练数据** | MARCO passage（片段1）；BERTbase（片段4） | 未找到 | BM25 warm-up；DPR checkpoint warm-up（片段1）；RoBERTabase（片段4） | MARCO + 大规模无监督数据 + cross-encoder 伪标签（片段2、3）；ERNIEbase（片段4） |
+| **负样本策略** | BM25 negatives（片段1） | 未找到 | BM25 negatives warm-up（片段1） | cross-batch negatives + denoised hard negatives + BM25 warm-up（片段1、2、3） |
+| **蒸馏/数据增强** | 未找到 | 未找到 | 未找到 | cross-encoder 生成伪标签做数据增强（片段2、3） |
+
+---
+
+## 六、推测部分（明确标注）
+
+以下为**我的推测**，非资料直接依据：
+
+- **推测**：DPR 原论文以 in-batch negatives 为主要负样本策略，但资料片段未直接说明，仅提到 BM25 negatives 可帮助训练。
+- **推测**：ANCE 原论文以"异步更新索引 + 近似最近邻负样本"为核心，但资料片段仅提到 BM25 warm-up，未涉及该机制。
+- **推测**：ColBERT 原论文以 late interaction 和 in-batch negatives 为主，但资料中完全无依据，不应作为结论。
+
+---
+
+## 七、结论
+
+基于提供的资料片段：
+- **RocketQA** 的训练配置最为完整，三大策略（cross-batch negatives、denoised hard negatives、cross-encoder 数据增强）均有明确依据。
+- **DPR** 和 **ANCE** 仅有零散信息（预训练模型、BM25 warm-up、DPR checkpoint 复用），完整训练配置未找到。
+- **ColBERT** 在资料中完全未出现，无法回答。
+
+如需完整对比，建议补充 DPR、ColBERT、ANCE 原论文及 ColBERT 相关训练配置的资料片段。

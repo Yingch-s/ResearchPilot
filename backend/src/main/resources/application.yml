@@ -19,8 +19,40 @@ researchpilot:
     # V0.4 H2.2: 请求级超时（LLM 请求自身可执行的超时）
     llm-request-timeout-seconds: ${RP_LLM_TIMEOUT:120}
     finalization-reserve-seconds: ${RP_FINALIZE_RESERVE:60}
+  redis:
+    # P1-D：Redis 限速与报告缓存（默认关——启用需 RP_REDIS_ENABLED=true + RP_REDIS_RATE_LIMIT=true
+    # + REDIS_PASSWORD；注意 spring.data.redis.enabled 只管既有 RedisConfig，与本开关相互独立）
+    enabled: 
+    rate-limit-enabled: 
+  auth:
+    rate-limit: 5
+    rate-limit-window-seconds: 60
+  retrieve:
+    # V3：查询翻译前置（中文查询→英文检索；默认关保持消融能力）
+    query-translation: ${RP_QUERY_TRANSLATION:false}
+  admission:
+    # P0-B 任务准入：全局并发上限与队列容量（active-runs <= 0 关闭准入，保持旧「直接执行」语义）
+    active-runs: ${RP_ADMISSION_ACTIVE:4}
+    queue-runs: ${RP_ADMISSION_QUEUE:50}
+    promote-interval-ms: 5000
+    promote-batch: 5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # P1-D：Prometheus 抓取业务指标（长任务容量口径）
+        include: health,prometheus
 
 server:
+  servlet:
+    session:
+      cookie:
+        # P0-A：会话 cookie 安全属性（SameSite=Lax 阻断跨站表单打无 body 端点；HTTPS 部署时另开 secure）
+        same-site: lax
+        http-only: true
+      tracking-modes: cookie
+
   port: 8080
 spring:
   config:

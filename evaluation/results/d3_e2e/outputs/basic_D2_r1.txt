@@ -1,0 +1,71 @@
+# D2 · basic · round 1
+
+这四篇论文的实验使用的操作系统和数据库软件是什么？
+
+---
+
+# 四篇论文实验使用的操作系统和数据库软件
+
+## 结论先行
+
+**在提供的所有资料片段中，均未找到任何关于操作系统（OS）或数据库软件（DBMS）的明确说明。** 因此，严格依据现有资料，无法回答这四篇论文实验所使用的操作系统和数据库软件。
+
+---
+
+## 逐篇说明
+
+### 论文1：ab1eb3d8-3cf0-40c4-b013-2232f1ca6afb（ColBERT）
+
+- **资料中有依据的结论**：
+  - 该论文为 ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT（Stanford University）。
+  - 实验使用三组查询集：官方开发集/评估集（约7k查询）、约55k带标签的额外验证数据、以及从中随机抽取的5k查询作为"本地"评估集。
+  - 评估涉及提交到 Microsoft 组织的竞赛（暗示与 MS MARCO 相关，但片段未明说）。
+  - 致谢中提及 Stanford DAWN 项目及多家企业支持者。
+- **关于操作系统/数据库**：**未找到**任何相关信息。
+- **推测**：片段提到 Microsoft 的竞赛与 held-out 评估，可能涉及 MS MARCO 数据集，但数据集本身不等于数据库软件；不能据此推断使用了何种 DBMS 或 OS。
+
+### 论文2：6220422c-c5a2-4edc-8fa2-e5ddba0cb0e6（涉及 DPR / RAG / ANCE 的 OpenQA 实验）
+
+- **资料中有依据的结论**：
+  - 实验基于 DPR 的开源库、HuggingFace 上的 RAG-Token 与 RAG-Seq 发布版本。
+  - 因 RAG-Seq 在 HuggingFace 上当时不稳定，故 OpenQA 实验选用 RAG-Token。
+  - RAG 仅发布 NQ 模型，故在 TriviaQA 上使用 DPR reader。
+  - 向 RAG-Token 输入 ANCE 的 top 20 passages（NQ），向 DPR 的 BERT Reader 输入 top 100 passages。
+- **关于操作系统/数据库**：**未找到**任何相关信息。
+- **推测**：使用 HuggingFace 开源库通常意味着基于 Python/PyTorch 环境，但资料未说明具体 OS 或数据库软件，不能编造。
+
+### 论文3：a7d4ec0a-f9a6-40eb-bc77-c8418c15a263（RocketQA）
+
+- **资料中有依据的结论**：
+  - 提出 RocketQA 优化训练方法，用于稠密段落检索。
+  - 三项技术贡献：cross-batch negatives、denoised hard negatives、data augmentation。
+  - 在 MS MARCO 和 Natural Questions 上显著优于此前 SOTA。
+  - 进行了端到端 QA 实验。
+- **关于操作系统/数据库**：**未找到**任何相关信息。
+- **推测**：MS MARCO 与 Natural Questions 是数据集名称，并非数据库软件；不能据此推断实验所用的 DBMS 或 OS。
+
+### 论文4：ab1eb3d8-3cf0-40c4-b013-2232f1ca6afb（与论文1同一篇，ColBERT 的引言部分）
+
+- **资料中有依据的结论**：
+  - 讨论基于 BERT 的排序模型在检索基准上取得 SOTA，并被 Google、Bing 等部署。
+  - 提及 ELMo、BERT 等预训练语言模型。
+- **关于操作系统/数据库**：**未找到**任何相关信息。
+- **推测**：无。
+
+---
+
+## 汇总表
+
+| 论文（片段ID） | 操作系统 | 数据库软件 | 资料依据 |
+|---|---|---|---|
+| ab1eb3d8…（ColBERT，片段1/2/4） | 未找到 | 未找到 | 无 |
+| 6220422c…（DPR/RAG/ANCE，片段3） | 未找到 | 未找到 | 无 |
+| a7d4ec0a…（RocketQA，片段5） | 未找到 | 未找到 | 无 |
+
+---
+
+## 说明
+
+- 上述"未找到"是指**在提供的资料片段范围内**没有出现相关信息，不代表论文原文中一定没有。
+- 若需准确回答该问题，建议查阅各论文的"实验设置（Experimental Setup）"或"实现细节（Implementation Details）"章节，通常 OS 与数据库信息会出现在那里。
+- 本回答未做任何编造或外推。

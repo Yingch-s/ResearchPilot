@@ -31,6 +31,8 @@ public class RpErrorHandler {
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> unexpected(Exception e) {
+		// 未预期异常必须留栈（此前静默吞掉，500 无从定位）
+		org.slf4j.LoggerFactory.getLogger(RpErrorHandler.class).error("未预期异常: {}", String.valueOf(e), e);
 		return response(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务暂时不可用，请稍后重试", true);
 	}
 

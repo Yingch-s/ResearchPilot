@@ -1,0 +1,64 @@
+# D2 · basic · round 2
+
+这四篇论文的实验使用的操作系统和数据库软件是什么？
+
+---
+
+# 关于四篇论文实验所用操作系统和数据库软件的说明
+
+## 结论先行
+
+**在提供的全部资料片段中，未找到任何一篇论文明确提及实验所使用的操作系统或数据库软件。** 以下逐篇说明。
+
+---
+
+## 逐篇分析
+
+### 1. 论文 ab1eb3d8-3cf0-40c4-b013-2232f1ca6afb（ColBERT）
+
+- **资料中有依据的结论**：
+  - 该论文为 *ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT*（Stanford University，作者 Omar Khattab、Matei Zaharia）。
+  - 片段1描述的是实验方法（数据集、查询集、评测方式），涉及 MS MARCO 相关的官方开发集/评测集、约 7k 查询、55k 带标签查询、5k 本地评测样本等。
+  - 片段2为致谢与资助信息（Stanford DAWN、NSF CAREER grant CNS-1651570 等）。
+  - 片段4为引言部分，讨论 BERT 类排序模型。
+- **操作系统 / 数据库软件**：**未找到**。片段中没有任何关于 OS、数据库（如 MySQL、PostgreSQL、MongoDB 等）或索引/检索后端（如 FAISS、Lucene、Anserini 等）的说明。
+
+### 2. 论文 6220422c-c5a2-4edc-8fa2-e5ddba0cb0e6（涉及 DPR / RAG / ANCE 的 OpenQA 实验）
+
+- **资料中有依据的结论**：
+  - 片段3说明 OpenQA 实验细节：DPR 相关实验设置、基线系统和 DPR Reader 基于其开源库；RAG-Token reader 使用 HuggingFace 上的开源发布；因 RAG-Seq 在 HuggingFace 上尚不稳定，故选用 RAG-Token；RAG 只发布了 NQ 模型，因此在 TriviaQA 上使用 DPR reader；向 RAG-Token 输入 ANCE 的 top 20 passages（NQ），向 DPR 的 BERT Reader 输入 top 100 passages。
+- **操作系统 / 数据库软件**：**未找到**。片段只提到开源库、HuggingFace 模型、passage 数量等，未涉及 OS 或数据库软件。
+
+### 3. 论文 a7d4ec0a-f9a6-40eb-bc77-c8418c15a263（RocketQA）
+
+- **资料中有依据的结论**：
+  - 片段5为摘要，介绍 RocketQA 用于稠密段落检索，提出 cross-batch negatives、denoised hard negatives、data augmentation 三项技术，在 MSMARCO 和 Natural Questions 上超越此前 SOTA，并展示端到端 QA 性能提升。
+- **操作系统 / 数据库软件**：**未找到**。摘要中完全没有提及实验环境。
+
+### 4. 第四篇论文
+
+- 提供的四个片段中，实际只对应 **三篇不同论文**（ab1eb3d8…、6220422c…、a7d4ec0a…）。问题中"四篇论文"的第四篇在资料中**没有对应片段**，因此无法说明。
+
+---
+
+## 汇总表
+
+| 论文（片段ID） | 操作系统 | 数据库软件 |
+|---|---|---|
+| ab1eb3d8…（ColBERT） | 未找到 | 未找到 |
+| 6220422c…（DPR/RAG/ANCE OpenQA） | 未找到 | 未找到 |
+| a7d4ec0a…（RocketQA） | 未找到 | 未找到 |
+| 第四篇（无对应片段） | 无资料 | 无资料 |
+
+---
+
+## 推测部分（明确标注为推测，非资料依据）
+
+- 这类 IR/NLP 论文通常实验在 **Linux（如 Ubuntu）** 环境、使用 **GPU 集群**，检索索引可能基于 **FAISS** 或 **Anserini/Lucene**，但这些在给定片段中**均无任何文字依据**，仅为领域常见做法的推测，不能作为结论。
+- 若需确认，建议查阅各论文的 "Experimental Setup" / "Implementation Details" 章节或附录、代码仓库（如 ColBERT、DPR、RocketQA 的 GitHub）中的 README 与环境配置文件。
+
+---
+
+## 最终回答
+
+**根据所给资料，四篇论文（实际可见三篇）均未提及实验使用的操作系统和数据库软件，因此无法回答该问题；资料中未找到相关信息。**

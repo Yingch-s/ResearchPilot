@@ -1,0 +1,75 @@
+# A1 · basic · round 3
+
+DPR、ColBERT、ANCE、RocketQA 四篇论文各自提出的检索/建模核心方法是什么？
+
+---
+
+根据提供的资料片段，我可以回答关于 **RocketQA** 的核心方法，但关于 **DPR、ColBERT、ANCE** 三篇论文的核心方法，资料中只有零散且间接的提及，不足以完整回答。以下逐一说明。
+
+---
+
+## 一、RocketQA（资料中有依据）
+
+RocketQA 是一种用于开放域问答的**稠密段落检索（dense passage retrieval）的优化训练方法**，基于双编码器（dual-encoder）架构。其核心是三项训练策略：
+
+1. **Cross-batch negatives（跨批次负样本）**
+   - 相比 in-batch negatives，它在训练中为每个问题增加了可用负样本的数量，并缓解训练与推理之间的差异（discrepancy）。
+
+2. **Denoised hard negatives（去噪难负样本）**
+   - 目的是从检索器返回的 top-ranked 结果中去除假负样本（false negatives），从而得到更可靠的难负样本。
+
+3. **Data augmentation（数据增强）**
+   - 利用 cross-encoder 对大规模无监督数据生成高质量的伪标签（pseudo labels），再用这些数据训练 dual-encoder 检索器。原因是 cross-encoder 在理论和实践中都比 dual-encoder 更强，但效率低，因此用它来“标注”数据。
+
+论文实验表明 RocketQA 在 MSMARCO 和 Natural Questions 上显著优于此前的最优模型，并能提升端到端问答的性能。
+
+---
+
+## 二、DPR（资料中仅有间接信息）
+
+资料片段3提到：
+> “The dense passage retrievers include DPR (Karpukhin et al., 2020), ME-BERT (Luan et al., 2020) and ANCE (Xiong et al., 2020). Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25...”
+
+据此可得到的**有依据结论**：
+- DPR 属于稠密段落检索器（dense passage retriever）。
+- DPR 使用 **in-batch random sampling**（批内随机采样）和 **从 BM25 检索结果中进行难负样本采样（hard negative sampling）**。
+
+**资料中未找到**：DPR 论文自身提出的完整核心方法（如双编码器结构细节、损失函数等）在给定片段中没有直接说明，因此不做推测。
+
+---
+
+## 三、ColBERT（资料中未找到）
+
+在提供的五个片段中，**完全没有出现 “ColBERT” 相关内容**。
+
+因此：
+- **未找到**关于 ColBERT 提出的检索/建模核心方法的任何资料依据。
+- 不做推测。
+
+---
+
+## 四、ANCE（资料中仅有间接信息）
+
+资料片段3提到：
+> “...ANCE (Xiong et al., 2020). Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25, while ANCE enhances the hard negative sampling by using the dense retriever.”
+
+据此可得到的**有依据结论**：
+- ANCE 属于稠密段落检索器。
+- ANCE 的核心特点之一是**通过使用稠密检索器（dense retriever）来增强难负样本采样**（相对于 DPR/ME-BERT 从 BM25 结果中采样难负样本）。
+
+**资料中未找到**：ANCE 论文的完整方法细节（如异步更新索引、训练流程等）在给定片段中没有说明，因此不做推测。
+
+---
+
+## 总结表
+
+| 论文 | 资料中有依据的核心方法 | 资料中未找到 |
+|---|---|---|
+| **DPR** | 稠密段落检索器；使用 in-batch 随机采样 + 从 BM25 结果中采样难负样本 | 论文自身完整方法细节 |
+| **ColBERT** | 无 | 全部（片段中未出现） |
+| **ANCE** | 稠密段落检索器；用稠密检索器增强难负样本采样 | 论文自身完整方法细节 |
+| **RocketQA** | 双编码器稠密检索的优化训练：cross-batch negatives、denoised hard negatives、data augmentation | — |
+
+---
+
+**说明**：以上“有依据结论”均直接来自所给片段；“未找到”部分表示给定资料不足以支撑回答，未做任何编造或推测。

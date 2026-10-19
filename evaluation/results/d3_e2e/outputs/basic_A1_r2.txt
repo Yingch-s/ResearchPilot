@@ -1,0 +1,80 @@
+# A1 · basic · round 2
+
+DPR、ColBERT、ANCE、RocketQA 四篇论文各自提出的检索/建模核心方法是什么？
+
+---
+
+根据提供的资料片段，我可以回答关于 **RocketQA** 的核心方法，但关于 **DPR、ColBERT、ANCE** 三篇论文的核心方法，资料中只有零散且间接的提及，不足以完整说明。以下逐一说明。
+
+---
+
+## 一、RocketQA（资料中有依据）
+
+RocketQA 是一种用于开放域问答的**稠密段落检索（dense passage retrieval）的优化训练方法**，基于 dual-encoder（双编码器）架构。其核心是三项训练策略：
+
+1. **Cross-batch negatives（跨批次负样本）**
+   - 相比 in-batch negatives，它在训练时增加了每个问题可用的负样本数量，并缓解了训练与推理之间的差异（discrepancy）。
+
+2. **Denoised hard negatives（去噪难负样本）**
+   - 目的是从检索器返回的 top-ranked 结果中移除假负样本（false negatives），从而得到更可靠的难负样本。
+
+3. **Data augmentation（数据增强）**
+   - 利用 cross-encoder 对大规模无监督数据生成高质量的伪标签（pseudo labels），再用这些数据训练 dual-encoder 检索器。资料指出 cross-encoder 在理论和实践中都比 dual-encoder 更强，但效率较低，因此用它来为无监督数据打标签。
+
+资料还提到，RocketQA 在 MSMARCO 和 Natural Questions 上显著优于此前的最优模型，并能提升端到端 QA 的性能。
+
+---
+
+## 二、DPR（资料中仅有间接信息）
+
+资料片段3在对比基线时提到：
+
+> "The dense passage retrievers include DPR (Karpukhin et al., 2020), ME-BERT (Luan et al., 2020) and ANCE (Xiong et al., 2020). Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25..."
+
+据此可得到的**有依据结论**：
+- DPR 属于稠密段落检索器（dense passage retriever）。
+- DPR 使用 **in-batch random sampling** 和 **从 BM25 检索结果中进行 hard negative sampling**。
+
+**未找到的信息**：资料中没有说明 DPR 的完整模型架构（如是否采用 dual-encoder、损失函数等）以及论文本身提出的其他核心贡献。因此无法完整回答"DPR 论文提出的核心方法"。
+
+---
+
+## 三、ColBERT（资料中未找到）
+
+在提供的五个片段中，**没有出现 "ColBERT" 的任何信息**。因此：
+
+- 关于 ColBERT 提出的检索/建模核心方法，**资料中未找到依据**，我不能编造。
+- 需要说明的是：ColBERT 通常被认为与 late interaction / 多向量表示相关，但这属于我的背景知识，**并非来自所给资料**，按您的要求不应作为结论呈现。
+
+---
+
+## 四、ANCE（资料中仅有间接信息）
+
+资料片段3提到：
+
+> "...ANCE (Xiong et al., 2020). Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25, while ANCE enhances the hard negative sampling by using the dense retriever."
+
+据此可得到的**有依据结论**：
+- ANCE 属于稠密段落检索器。
+- ANCE 的核心特点之一是**通过使用稠密检索器（dense retriever）来增强难负样本采样**（相对于 DPR/ME-BERT 从 BM25 结果中采样难负样本）。
+
+**未找到的信息**：资料没有说明 ANCE 的完整训练框架（如异步更新索引、近似负样本等细节），也没有给出其论文标题或完整方法描述。因此无法完整回答"ANCE 论文提出的核心方法"。
+
+---
+
+## 五、总结对照表
+
+| 论文 | 资料中有依据的核心方法 | 资料中未找到 |
+|---|---|---|
+| **RocketQA** | 三项训练策略：cross-batch negatives、denoised hard negatives、data augmentation（用 cross-encoder 为无监督数据打伪标签） | — |
+| **DPR** | 稠密段落检索器；使用 in-batch random sampling + 从 BM25 结果中做 hard negative sampling | 完整架构、损失函数、论文其他贡献 |
+| **ColBERT** | 无 | 全部（资料中未出现） |
+| **ANCE** | 稠密段落检索器；用 dense retriever 增强 hard negative sampling | 完整训练框架与细节 |
+
+---
+
+## 六、推测与说明
+
+- 上表中"资料中有依据的结论"均直接来自片段1–5。
+- 我**没有**对 DPR、ColBERT、ANCE 的完整方法做任何推测性补充；若需要完整回答，建议补充这三篇论文的原文或摘要片段。
+- 特别提示：片段3中 "DRP" 应为 "DPR" 的笔误（同一句先写 DPR，后写 DRP），这属于资料内部的文字不一致，不影响其指代 DPR 的判断。

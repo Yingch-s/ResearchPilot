@@ -1,0 +1,112 @@
+# A2 · b0 · round 1
+
+这四篇论文（DPR、ColBERT、ANCE、RocketQA）分别使用了什么训练数据，标注需求有何不同？
+
+---
+
+下面按论文逐一说明它们使用的训练数据与标注需求。先给一个总览，再分述。
+
+## 总览
+
+| 论文 | 主要训练数据 | 标注需求 |
+|---|---|---|
+| DPR | Natural Questions、TriviaQA、WebQuestions、CuratedTREC、SQuAD 等 QA 数据集构造的 (question, positive passage) 对；另用 BM25 采负例 | 只需 question–answer 或 question–positive passage 的弱监督；负例由 BM25 自动挖掘，无需人工标注负例 |
+| ColBERT | MS MARCO（主要）、TREC CAR、Wikipedia 等；MS MARCO 用其提供的 query–passage 相关性标注 | 依赖 MS MARCO 的大规模 query–passage 相关性标注（二元相关/不相关）；负例来自标注或采样 |
+| ANCE | MS MARCO、Natural Questions、TriviaQA 等；核心是用 ANCE 从全库中异步刷新负例 | 同样主要依赖 MS MARCO 的 query–passage 相关性标注；ANCE 的负例是模型自动挖掘的“难负例”，不需要额外人工标注 |
+| RocketQA | MS MARCO、Natural Questions、TriviaQA 等；用 cross-encoder 过滤/去噪，并用 denoised 数据训练 dual-encoder | 依赖已有标注数据（如 MS MARCO 的相关性标注、NQ/TriviaQA 的 QA 对）；通过 cross-encoder 自动去噪和挖掘难负例，减少对人工负例的依赖 |
+
+## 1. DPR（Dense Passage Retrieval）
+
+**训练数据**
+- DPR 的核心是构造 (question, positive passage) 对。论文中主要用了多个 QA 数据集：
+  - Natural Questions（NQ）
+  - TriviaQA
+  - WebQuestions
+  - CuratedTREC
+  - SQuAD（部分设置中）
+- 正例通常来自数据集中标注的答案所在段落，或包含答案的 passage。
+- 负例：
+  - 论文中常用 BM25 从大规模语料中检索出的、但不包含答案的 passage 作为负例。
+  - 也讨论了 in-batch negatives 等策略。
+
+**标注需求**
+- 不需要人工标注“负例”。负例由 BM25 自动挖掘。
+- 正例来自已有 QA 数据集的答案标注或段落标注。
+- 因此标注需求相对低：主要是复用已有 QA 数据集中的 question–answer / question–passage 对应关系。
+
+**不确定点**
+- DPR 在不同实验设置下具体用了哪些数据组合，论文中有多种配置；如果要求精确到每个实验的配比，需要查原文表格。上面列的是常见配置。
+
+## 2. ColBERT
+
+**训练数据**
+- 主要使用 MS MARCO。
+- 也涉及 TREC CAR、Wikipedia 等。
+- MS MARCO 提供大规模 query–passage 相关性标注，ColBERT 用其训练 late interaction 模型。
+
+**标注需求**
+- 依赖 MS MARCO 的 query–passage 相关性标注。
+- MS MARCO 的标注通常是二元或分级相关性，由人工/众包产生。
+- 负例可以来自标注为不相关的 passage，也可以从语料中采样。
+- ColBERT 本身不强调“自动挖掘难负例”作为核心贡献，更多是模型结构和训练方式。
+
+**不确定点**
+- ColBERT 原论文在不同实验中也用了额外数据；如果问的是“原始 ColBERT 论文”，主要是 MS MARCO。后续 ColBERTv2 等有变化。
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning）
+
+**训练数据**
+- 常用 MS MARCO。
+- 也在 Natural Questions、TriviaQA 等上做实验。
+- 核心不是新数据集，而是负例采样方式：用 ANN 索引从全库中异步刷新负例。
+
+**标注需求**
+- 仍然依赖已有标注数据，尤其是 MS MARCO 的 query–passage 相关性标注。
+- 正例来自标注的相关 passage。
+- 负例由 ANCE 自动从全库中挖掘：模型当前认为最像正例但实际不相关的 passage。
+- 因此不需要额外人工标注负例，但需要已有正例/相关性标注。
+
+**不确定点**
+- ANCE 论文中不同数据集的实验设置不同；如果要求精确的数据配比，需要查原文。
+
+## 4. RocketQA
+
+**训练数据**
+- MS MARCO、Natural Questions、TriviaQA 等。
+- 核心流程：
+  1. 用 cross-encoder 对已有标注数据去噪；
+  2. 用去噪后的数据训练 dual-encoder；
+  3. 用 dual-encoder 和 cross-encoder 联合挖掘难负例。
+
+**标注需求**
+- 依赖已有标注数据，如 MS MARCO 的相关性标注、NQ/TriviaQA 的 QA 对。
+- 通过 cross-encoder 自动过滤噪声，减少对人工标注质量的依赖。
+- 负例由模型自动挖掘，不需要额外人工标注负例。
+- 论文强调“denoised”和“unsupervised”难负例挖掘，目的是在有限标注下提升效果。
+
+**不确定点**
+- RocketQA 有多个版本和后续工作；如果指原始 RocketQA 论文，主要是上述流程。具体数据配比需查原文。
+
+## 关键区别总结
+
+1. **DPR**
+   - 数据：多个 QA 数据集构造 question–positive passage。
+   - 负例：BM25 自动挖掘。
+   - 标注：复用 QA 标注，无需人工负例。
+
+2. **ColBERT**
+   - 数据：主要是 MS MARCO。
+   - 负例：来自标注或采样。
+   - 标注：依赖 MS MARCO 的 query–passage 相关性标注。
+
+3. **ANCE**
+   - 数据：MS MARCO 等。
+   - 负例：ANN 全库异步刷新，自动挖掘难负例。
+   - 标注：依赖已有正例/相关性标注，无需人工负例。
+
+4. **RocketQA**
+   - 数据：MS MARCO、NQ、TriviaQA 等。
+   - 负例：cross-encoder 去噪 + 自动挖掘难负例。
+   - 标注：依赖已有标注，但通过去噪减少对标注噪声的敏感。
+
+**总体趋势**：DPR 和 ColBERT 更依赖已有标注数据加自动负例；ANCE 和 RocketQA 进一步减少对人工负例的依赖，强调自动挖掘难负例和去噪。四者都不需要为负例做额外人工标注，但都需要已有的 question–passage 或 query–passage 相关性/答案标注作为正例来源。

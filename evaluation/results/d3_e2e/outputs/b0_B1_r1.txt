@@ -1,0 +1,121 @@
+# B1 · b0 · round 1
+
+对比 DPR、ColBERT、ANCE、RocketQA 的训练配置全貌：训练数据、负样本策略、蒸馏/数据增强。
+
+---
+
+下面按 **DPR、ColBERT、ANCE、RocketQA** 四个对象，从“训练数据、负样本策略、蒸馏/数据增强”三个维度做对比。先给结论表，再逐项说明。需要先说明：这些方法有多个版本/后续变体，下面主要以其**代表性论文/原始版本**为准；涉及后续版本时会单独标注。
+
+## 一、总览对比表
+
+| 维度 | DPR | ColBERT | ANCE | RocketQA |
+|---|---|---|---|---|
+| 代表论文 | Karpukhin et al., EMNLP 2020 | Khattab & Zaharia, SIGIR 2020 | Xiong et al., ICLR 2021 | Qu et al., NAACL 2021 |
+| 训练数据 | 主要用 Natural Questions、TriviaQA、WebQuestions、CuratedTREC 等 QA 数据；用 BM25 检索 top passages 作为正/负样本来源 | 主要用 MS MARCO passage ranking；也常用 TREC CAR 等；训练 triple/paired 数据 | 通常基于开放域 QA 数据，如 NQ、TriviaQA 等；用 BM25 先召回候选 | 主要用 MS MARCO、NQ、TriviaQA 等；并强调大规模无标注语料 + 自动构造训练数据 |
+| 正样本 | 含答案的 passage；DPR 中通常将含答案段落作为正例，可能取多个 | MS MARCO 中相关 passage；ColBERT 用 query-passage 相关性监督 | 含答案 passage；ANCE 关注从 BM25 候选中选正例 | 含答案 passage；RocketQA 还通过 cross-encoder 过滤/标注 |
+| 负样本策略 | 随机负样本 + BM25 难负样本；每个 query 配若干负例；训练中可刷新 | 主要 in-batch negatives；MS MARCO 训练中同 batch 其他 passage 作为负例；也可加 hard negatives | 核心是 **ANCE：异步更新索引，从全库/大候选集中采样当前模型认为最难的负例** | 多阶段：BM25 负例、cross-encoder 过滤、去噪；强调 **denoised hard negatives** |
+| 蒸馏 | 原始 DPR 不强调蒸馏；后续有蒸馏版如 RocketQA/DPR 蒸馏、TAS-B 等 | 原始 ColBERT 不强调蒸馏；后续 ColBERTv2、蒸馏变体有 | 原始 ANCE 不强调蒸馏；主要是难负样本训练 | RocketQA 明确使用 **cross-encoder 蒸馏到 dual-encoder**，并有多阶段蒸馏/过滤 |
+| 数据增强 | 原始 DPR 主要靠多数据集联合训练；无强数据增强 | 原始 ColBERT 主要靠 MS MARCO 等；无强数据增强 | 原始 ANCE 主要靠难负样本挖掘；无强数据增强 | RocketQA 强调 **自动构造/增强训练数据**：用 cross-encoder 标注、过滤假负例、生成更多正例/难负例 |
+| 关键特点 | 双塔 dense retriever，BM25 难负样本是重点 | 多向量 late interaction，in-batch negatives 高效 | 难负样本异步更新，解决 hard negative 分布漂移 | 工业级数据清洗 + 蒸馏 + 去噪难负例，强调数据质量 |
+
+---
+
+## 二、逐项说明
+
+### 1. DPR
+
+**训练数据**
+- DPR 原始论文主要使用开放域 QA 数据集：Natural Questions、TriviaQA、WebQuestions、CuratedTREC 等。
+- 训练时通常先用 BM25 从 Wikipedia 中召回候选 passage，再将其中含答案的 passage 作为正例。
+- 多数据集可以联合训练，以提升泛化。
+
+**负样本策略**
+- DPR 的经典配置是：
+  - **随机负样本**：从语料中随机抽取 passage。
+  - **BM25 难负样本**：用 BM25 召回但与问题不包含答案的 passage。
+- 每个 query 通常配 1 个正例 + 若干负例；论文中常见配置是 1 正 + 1 个 BM25 难负 + 若干随机负，或类似比例。
+- 训练过程中会定期刷新负样本，但不像 ANCE 那样每步用当前模型异步更新全库索引。
+
+**蒸馏/数据增强**
+- 原始 DPR 不强调知识蒸馏，也不以数据增强为核心。
+- 后续社区版本中，DPR 常被用作学生模型或教师模型进行蒸馏，例如 RocketQA、TAS-B 等工作会蒸馏到 DPR 类双塔结构。
+- 因此：**原始 DPR：无蒸馏/弱数据增强；后续 DPR 变体：常参与蒸馏。**
+
+**不确定点**
+- DPR 在不同实现中负样本比例、是否刷新、是否多数据集混合，细节差异较大；具体配置需看对应代码/论文附录。
+
+---
+
+### 2. ColBERT
+
+**训练数据**
+- 原始 ColBERT 主要面向 MS MARCO passage ranking 训练。
+- 也常用于 TREC CAR、Wikipedia 等检索/QA 数据。
+- 训练形式通常是 query-passage 对或三元组。
+
+**负样本策略**
+- ColBERT 原始论文强调 **in-batch negatives**：一个 batch 内，其他 query 的正 passage 作为当前 query 的负例。
+- 这种方式计算高效，因为 late interaction 可以对 batch 内所有 passage 复用编码。
+- 也可加入 hard negatives，但原始 ColBERT 的核心卖点不是难负样本挖掘，而是 late interaction + in-batch negatives。
+- 后续 ColBERTv2 等版本会加入蒸馏、难负样本、去噪等。
+
+**蒸馏/数据增强**
+- 原始 ColBERT 不强调蒸馏。
+- 后续 ColBERTv2、ColBERT-X、以及一些蒸馏版 ColBERT 会使用 cross-encoder 蒸馏、伪标签、数据增强。
+- 原始版本的数据增强也较弱，主要依赖 MS MARCO 大规模训练数据。
+
+**不确定点**
+- ColBERT 有多个版本：ColBERT、ColBERTv2、ColBERT-X、ColBERTer 等。若问题指“原始 ColBERT”，则蒸馏/数据增强不是重点；若指后续版本，则配置不同。
+
+---
+
+### 3. ANCE
+
+**训练数据**
+- ANCE 通常用于开放域 QA / passage retrieval，常见数据包括 Natural Questions、TriviaQA 等。
+- 训练流程：先用 BM25 召回候选 passage，再从中选正例和负例。
+- 正例通常是含答案 passage。
+
+**负样本策略**
+- ANCE 的核心是 **Approximate Nearest Neighbor Negative Contrastive Estimation**。
+- 它不只使用静态 BM25 难负样本，而是：
+  - 定期用当前 dual-encoder 对全库或大候选集建索引；
+  - 对每个 query 检索出当前模型认为最相似、但非正例的 passage 作为难负样本；
+  - 异步更新索引和负样本，避免每次训练 step 都重建索引。
+- 这样能缓解“难负样本分布随模型变化而漂移”的问题。
+- 相比 DPR 的静态 BM25 难负样本，ANCE 的负样本更“动态”和“模型相关”。
+
+**蒸馏/数据增强**
+- 原始 ANCE 不强调蒸馏。
+- 也不以数据增强为核心；其主要贡献是难负样本采样策略。
+- 后续一些工作会把 ANCE 思想与蒸馏结合，但原始 ANCE 本身不是蒸馏方法。
+
+**不确定点**
+- ANCE 的具体候选集大小、刷新频率、索引更新策略在不同实现中不同；论文中有异步索引和缓存机制，细节需看原文。
+
+---
+
+### 4. RocketQA
+
+**训练数据**
+- RocketQA 是百度提出的面向工业级开放域 QA 的检索训练框架。
+- 使用数据包括 MS MARCO、Natural Questions、TriviaQA 等，也强调大规模无标注语料。
+- 其核心不是单一数据集，而是 **多阶段数据构造与清洗**：
+  - 用 BM25 召回候选；
+  - 用 cross-encoder 对候选打分；
+  - 过滤假负例、噪声样本；
+  - 构造更干净的正例和难负例。
+
+**负样本策略**
+- RocketQA 的负样本策略非常强调“去噪”：
+  - 先用 BM25 召回候选；
+  - 用 cross-encoder 判断候选与 query 的相关性；
+  - 将 cross-encoder 认为不相关但 dual-encoder 可能混淆的样本作为难负例；
+  - 过滤掉“假负例”（即实际相关但被当作负例的样本）。
+- 它提出 **denoised hard negatives**，解决难负样本中噪声过大的问题。
+- 还使用 cross-encoder 标注/过滤，提升训练数据质量。
+
+**蒸馏/数据增强**
+- RocketQA 明确使用 **cross-encoder 蒸馏到 dual-encoder**：
+  - cross-encoder 作为教师，对 query-passage 对打分；
+  - dual-encoder 作为学生，学习教师的相关性分布

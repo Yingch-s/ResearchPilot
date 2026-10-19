@@ -50,6 +50,9 @@ public class RpRetrievalService {
 
 	private final SidecarClient sidecar;
 
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private QueryTranslator queryTranslator;
+
 	private final ResearchPilotConfig.KbProperties props;
 
 	private final ConcurrentHashMap<String, CacheEntry> retrievalCache = new ConcurrentHashMap<>();
@@ -89,9 +92,18 @@ public class RpRetrievalService {
 	 */
 	public List<Candidate> hybridRetrieve(String topicId, List<String> paperIds, String query, int topK,
 			boolean withParentExpansion) {
+		return hybridRetrieve(topicId, paperIds, query, topK, withParentExpansion, null);
+	}
+
+	/**
+	 * channels：检索通道选择（D1 评测对照用）——null 或含 "bm25"/"dense" 决定启用哪些通道。 null 等价于双通道全开。
+	 */
+	public List<Candidate> hybridRetrieve(String topicId, List<String> paperIds, String query, int topK,
+			boolean withParentExpansion, List<String> channels) {
 		String identity = sidecar.embeddingIdentity();
 		if (identity != null) {
-			String cacheKey = cacheKey(topicId, paperIds, query, topK, withParentExpansion, identity);
+			String cacheKey = cacheKey(topicId, paperIds, query, topK, withParentExpansion, identity,
+					channels == null ? "both" : String.join("+", channels));
 			CacheEntry cached = retrievalCache.get(cacheKey);
 			if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
 				return cached.candidates();
@@ -99,7 +111,8 @@ public class RpRetrievalService {
 			if (cached != null) {
 				retrievalCache.remove(cacheKey, cached);
 			}
-			List<Candidate> result = hybridRetrieveUncached(topicId, paperIds, query, topK, withParentExpansion);
+			List<Candidate> result = hybridRetrieveUncached(topicId, paperIds, query, topK, withParentExpansion,
+					channels);
 			if (retrievalCache.size() >= MAX_CACHE_ENTRIES) {
 				retrievalCache.keySet().stream().findFirst().ifPresent(retrievalCache::remove);
 			}
@@ -107,27 +120,41 @@ public class RpRetrievalService {
 					new CacheEntry(List.copyOf(result), Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
 			return result;
 		}
-		return hybridRetrieveUncached(topicId, paperIds, query, topK, withParentExpansion);
+		return hybridRetrieveUncached(topicId, paperIds, query, topK, withParentExpansion, channels);
 	}
 
 	private List<Candidate> hybridRetrieveUncached(String topicId, List<String> paperIds, String query, int topK,
-			boolean withParentExpansion) {
+			boolean withParentExpansion, List<String> channels) {
+		// V3：查询翻译前置 —— 中文查询翻译为英文后走两通道；翻译失败（降级）跳过 BM25
+		// （中文词面与英文语料零重叠，BM25 只产生噪声，zh_en 专项实测 R@10 保持率 47%）
+		String effectiveQuery = query;
+		boolean chineseQuery = queryTranslator != null && QueryTranslator.isChinese(query);
+		if (chineseQuery) {
+			effectiveQuery = queryTranslator.translate(query);
+		}
+		boolean useBm25 = channels == null || channels.contains("bm25");
+		boolean useDense = channels == null || channels.contains("dense");
+		if (chineseQuery) {
+			useBm25 = useBm25 && !effectiveQuery.equals(query); // 翻译失败 → 跳过 BM25
+		}
 		int perChannel = Math.max(topK, 20);
-		List<double[]> queryVec = sidecar.embed(List.of(query));
-		List<String> channelA = bm25Search(topicId, paperIds, query, perChannel);
-		List<String> channelB = denseSearch(topicId, paperIds, queryVec.get(0), perChannel);
+		List<double[]> queryVec = useDense ? sidecar.embed(List.of(effectiveQuery)) : List.of();
+		List<String> channelA = useBm25 ? bm25Search(topicId, paperIds, effectiveQuery, perChannel) : List.of();
+		List<String> channelB = useDense
+				? denseSearch(topicId, paperIds, queryVec.isEmpty() ? new double[0] : queryVec.get(0), perChannel)
+				: List.of();
 
 		// RRF 融合：score = Σ 1/(k + rank)
 		Map<String, Double> fused = new LinkedHashMap<>();
-		Map<String, List<String>> channels = new LinkedHashMap<>();
-		accumulate(channelA, "bm25", fused, channels);
-		accumulate(channelB, "dense", fused, channels);
+		Map<String, List<String>> channelTags = new LinkedHashMap<>();
+		accumulate(channelA, "bm25", fused, channelTags);
+		accumulate(channelB, "dense", fused, channelTags);
 		if (requestsAbstract(query)) {
 			// Section lookup must not depend on semantic rank for an explicit request
 			// to read/translate the abstract. The same scope filters still apply.
 			for (String id : abstractSearch(topicId, paperIds)) {
 				fused.merge(id, 1.0, Double::sum);
-				channels.computeIfAbsent(id, k -> new ArrayList<>()).add("abstract-section");
+				channelTags.computeIfAbsent(id, k -> new ArrayList<>()).add("abstract-section");
 			}
 		}
 
@@ -157,7 +184,7 @@ public class RpRetrievalService {
 			}
 			candidates.add(new Candidate(id, (String) src.get("paper_id"), (String) src.get("parent_id"),
 					(String) src.get("text"), (String) src.get("section_path"), (Integer) src.get("page"),
-					(String) src.get("content_type"), fused.get(id), channels.get(id)));
+					(String) src.get("content_type"), fused.get(id), channelTags.get(id)));
 		}
 		candidates
 			.sort(java.util.Comparator.<Candidate>comparingDouble(c -> c.fusedScore() + sectionBoost(c.sectionPath()))
@@ -195,7 +222,7 @@ public class RpRetrievalService {
 	}
 
 	static String cacheKey(String topicId, List<String> paperIds, String query, int topK, boolean withParentExpansion,
-			String embeddingIdentity) {
+			String embeddingIdentity, String channelsKey) {
 		List<String> scope = paperIds == null ? List.of() : paperIds.stream().sorted().toList();
 		return String.join("|", String.valueOf(topicId), String.join(",", scope), normalizeQuery(query),
 				String.valueOf(topK), String.valueOf(withParentExpansion), embeddingIdentity);

@@ -1,0 +1,113 @@
+# A2 · basic · round 3
+
+这四篇论文（DPR、ColBERT、ANCE、RocketQA）分别使用了什么训练数据，标注需求有何不同？
+
+---
+
+# 四篇论文（DPR、ColBERT、ANCE、RocketQA）的训练数据与标注需求对比
+
+## 重要说明
+
+在回答之前需要先说明：**检索到的资料片段主要来自 RocketQA 论文**，其中对 DPR、ANCE 有少量提及（如预训练语言模型、BM25 warm-up 等），但**关于 ColBERT 的训练数据和标注需求，资料中完全没有涉及**。因此，对于 ColBERT 部分，我只能明确说明"未找到依据"，不做编造。
+
+下面逐一说明。
+
+---
+
+## 1. DPR（Dense Passage Retrieval）
+
+**资料中有依据的结论：**
+- 片段4提到：DPR 使用 **BERTbase** 作为预训练语言模型。
+- 片段3提到：在 OpenQA 任务中，ANCE 是使用 **DPR 发布的 checkpoint** 进行 warm-up 的，说明 DPR 有公开的预训练模型。
+- 片段3还提到：BM25 negatives 可以帮助训练 dense retrieval，并引用了 Karpukhin et al., 2020（即 DPR 论文），暗示 DPR 的训练中使用了 BM25 负样本。
+
+**资料中未找到的信息：**
+- DPR 具体使用了哪些数据集（如 NQ、TriviaQA、WebQuestions、CuratedTREC 等）作为训练数据。
+- DPR 的标注需求（如是否需要人工标注的正负样本对、是否使用 BM25 挖掘负样本等细节）。
+
+**我的推测（非资料依据）：**
+- 根据片段3的引用关系，DPR 很可能使用了 BM25 负样本进行训练，但具体数据规模和标注方式资料未提供。
+
+---
+
+## 2. ColBERT
+
+**资料中有依据的结论：**
+- **无。** 检索到的四个片段中没有任何一处提及 ColBERT。
+
+**资料中未找到的信息：**
+- ColBERT 使用的训练数据。
+- ColBERT 的标注需求。
+- ColBERT 的任何训练策略或数据细节。
+
+**结论：** 关于 ColBERT，资料中完全未找到相关信息，无法作答。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Estimation）
+
+**资料中有依据的结论：**
+- 片段3提到：ANCE 使用 **BM25 negatives 进行 warm-up**。
+- 片段3提到：在 OpenQA 任务中，ANCE 使用 **DPR 发布的 checkpoint** 进行 warm-up。
+- 片段4提到：ANCE 使用 **RoBERTabase** 作为预训练语言模型。
+- 片段3提到：ANCE 在 TREC DL 中也是从 RoBERTabase 微调而来。
+
+**资料中未找到的信息：**
+- ANCE 具体使用的训练数据集名称和规模。
+- ANCE 的标注需求（如是否使用人工标注、是否使用未标注语料、负样本如何选取等细节）。
+- ANCE 是否使用了除 BM25 negatives 之外的其他负样本挖掘方式。
+
+**我的推测（非资料依据）：**
+- ANCE 的核心思想是使用近似最近邻负样本进行对比学习，但资料中未提供其训练数据的具体构成和标注方式。
+
+---
+
+## 4. RocketQA
+
+**资料中有依据的结论（这是资料最充分的一篇）：**
+
+**训练数据与数据增强：**
+- 片段1和片段2明确指出：RocketQA 利用**大规模无监督数据**，通过 **cross-encoder 生成高质量的伪标签（pseudo labels）** 来进行数据增强，用于训练 dual-encoder retriever。
+- 片段1提到：cross-encoder 虽然效率低，但在理论和实践中都比 dual-encoder 更强，因此用它来为无标注数据生成伪标签。
+
+**负样本策略：**
+- 片段1和片段2提到三大技术贡献：
+  1. **Cross-batch negatives**：相比 in-batch negatives，增加了每个问题可用的负样本数量，缓解训练与推理之间的差异。
+  2. **Denoised hard negatives**：从 retriever 检索到的 top-ranked 结果中去除假阴性（false negatives），获得更可靠的 hard negatives。
+  3. **Data augmentation**：利用 cross-encoder 为无监督数据生成伪标签。
+
+**预训练语言模型：**
+- 片段4提到：RocketQA 主要使用 **ERNIEbase**，也尝试过用 BERTbase 替换，性能略有下降。
+
+**评测数据集：**
+- 片段2提到：RocketQA 在 **MSMARCO** 和 **Natural Questions** 上显著优于之前的最优模型。
+
+**标注需求（资料中有依据的结论）：**
+- RocketQA 明确利用了**大规模无监督数据**，并通过 cross-encoder 生成**伪标签**，说明它**不依赖大量人工标注**，而是通过伪标签方式扩充训练数据。
+- 同时，它使用了 **denoised hard negatives**，说明需要从检索结果中筛选和去噪，这涉及对负样本的自动筛选而非纯人工标注。
+
+**资料中未找到的信息：**
+- RocketQA 具体使用了哪些无监督数据集（名称、规模）。
+- Cross-encoder 生成伪标签的具体标注流程和人工参与程度。
+- Denoised hard negatives 的具体去噪标准（如阈值、人工规则等）。
+
+---
+
+## 总结对比表
+
+| 论文 | 训练数据（资料依据） | 标注需求（资料依据） | 资料未覆盖 |
+|------|---------------------|---------------------|-----------|
+| DPR | 使用 BERTbase；引用 BM25 negatives 可帮助训练 | 未明确说明 | 具体数据集、标注方式 |
+| ColBERT | **完全未找到** | **完全未找到** | 全部 |
+| ANCE | BM25 negatives warm-up；DPR checkpoint warm-up；RoBERTabase | 未明确说明 | 具体数据集、标注方式 |
+| RocketQA | 大规模无监督数据 + cross-encoder 伪标签；MSMARCO、NQ 评测；ERNIEbase | 不依赖大量人工标注，使用伪标签和去噪 hard negatives | 具体无监督数据名称、伪标签流程细节 |
+
+---
+
+## 需要特别指出的资料缺口
+
+1. **ColBERT 完全缺失**：四个片段中没有一处提及 ColBERT，无法回答其训练数据和标注需求。
+2. **DPR 和 ANCE 的标注需求不明确**：资料只提到它们使用了 BM25 negatives 和预训练模型，但没有说明是否需要人工标注正样本、负样本如何标注等。
+3. **RocketQA 的标注需求相对最清晰**：资料明确说明它使用无监督数据 + cross-encoder 伪标签，减少了对人工标注的依赖，但具体流程细节仍不完整。
+
+如果需要更完整的对比，建议补充检索 DPR、ColBERT、ANCE 原文中关于训练数据和标注方法的章节。

@@ -1,0 +1,39 @@
+# E1 · b0 · round 1
+
+RocketQA 的去噪（denoising）策略在论文的哪一部分？具体做了什么？
+
+---
+
+结论先说：**RocketQA 的去噪策略主要出现在论文中介绍“训练数据构造 / 负样本采样”的部分，通常对应方法（Method）章节里关于训练数据与负例采样的小节，而不是单独作为一个“Denoising”章节。** 它的核心不是对 query 或 passage 文本做清洗，而是**对训练用的负样本进行去噪**，尤其是解决“假阴性”（false negative）问题。
+
+具体来说：
+
+1. **位置**
+   - 在 RocketQA 论文 *RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering* 中，去噪策略属于**训练方法/数据构造**的一部分。
+   - 更具体地说，它和 **cross-batch negatives、denoised hard negatives、data augmentation** 这些训练技巧放在一起讲。
+   - 如果按常见章节结构，大致在：
+     - Method / Approach
+       - Training Data Construction
+       - Negative Sampling / Denoised Hard Negatives
+   - 不同版本排版可能略有差异，但主题位置是明确的：**方法部分中关于负例构造与训练数据去噪的内容**。
+
+2. **去噪针对什么问题**
+   - 在 dense retriever 训练中，常用 in-batch negatives 或 hard negatives。
+   - 但检索器召回的高分负样本里，可能其实包含正确答案，只是没有被标注为正例。
+   - 这些样本叫 **false negatives / 假阴性**。
+   - 如果直接把它们当负例训练，会伤害模型，因为模型被要求把“其实相关”的文档推远。
+
+3. **RocketQA 具体做了什么**
+   - 它使用一个**交叉编码器（cross-encoder）**来对候选负样本进行重新打分/判别。
+   - 对于从检索器或 BM25 等召回的候选段落，cross-encoder 会判断它与 query 的相关性。
+   - 如果某个候选虽然被当作负例，但 cross-encoder 给出较高相关性分数，就认为它可能是假阴性，不应继续作为负例，或需要被过滤/降权。
+   - 这样得到更干净的负样本集合，再用于训练 dual-encoder retriever。
+   - 论文中还常配合：
+     - **cross-batch negatives**：扩大负样本数量，提高训练效率；
+     - **denoised hard negatives**：用 cross-encoder 过滤 hard negatives 中的假阴性；
+     - **data augmentation**：用模型挖掘更多训练数据，再经过去噪后加入训练。
+
+4. **一句话概括**
+   - RocketQA 的去噪策略在论文的方法部分，具体是：**用 cross-encoder 对候选负样本重新评估，过滤掉可能是假阴性的“负例”，从而构造更干净的训练负样本，提升 dense retriever 的训练效果。**
+
+如果你需要，我可以继续帮你定位到论文中具体的小节标题、算法框或公式编号；但那需要你提供论文版本或 PDF 内容，因为不同 arXiv 版本的章节编号可能不同。

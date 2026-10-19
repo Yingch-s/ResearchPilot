@@ -1,0 +1,122 @@
+# A2 · b0 · round 2
+
+这四篇论文（DPR、ColBERT、ANCE、RocketQA）分别使用了什么训练数据，标注需求有何不同？
+
+---
+
+下面按论文分别说明它们使用的训练数据与标注需求。先给一个总览，再逐篇展开。
+
+## 总览
+
+| 论文 | 主要训练数据 | 标注需求 |
+|---|---|---|
+| DPR | Natural Questions、TriviaQA、WebQuestions、CuratedTREC、SQuAD 等 QA 数据集 | 利用问答对中的“答案”做远程监督，把含答案的段落当作正例；无需人工标注段落相关性 |
+| ColBERT | MS MARCO（及部分其他检索/QA 数据） | 主要用 MS MARCO 的“查询-相关段落”判断；属于人工/半人工相关性标注，但非本文新标注 |
+| ANCE | MS MARCO，另用 NQ、TriviaQA 等做零样本评估 | 训练主要依赖 MS MARCO 的相关性标注；ANCE 本身不新增人工标注，而是用模型自己从全库中采样负例 |
+| RocketQA | MS MARCO，另用 NQ、TriviaQA 等做评估 | 训练数据来自 MS MARCO 的标注相关性；RocketQA 的关键是跨批次负例、去噪和伪标签，不要求新增人工标注 |
+
+---
+
+## 1. DPR（Dense Passage Retrieval for Open-Domain Question Answering）
+
+**训练数据**
+- DPR 的训练主要来自多个抽取式 QA 数据集，包括：
+  - Natural Questions（NQ）
+  - TriviaQA
+  - WebQuestions
+  - CuratedTREC
+  - SQuAD
+- 具体做法是：从这些 QA 数据集中取“问题”和“答案”，然后在对应语料（如 Wikipedia）中找包含答案的段落，作为正例段落。
+- 负例通常来自同一批次中的其他问题的正例段落，或随机段落。
+
+**标注需求**
+- 不需要为“段落相关性”做新的人工标注。
+- 它利用的是 QA 数据集中已有的“问题-答案”对，通过答案字符串匹配来远程监督正例段落。
+- 因此标注需求较低，但代价是正例可能包含噪声：含答案的段落不一定真正回答该问题。
+
+**不确定点**
+- DPR 论文中不同实验设置下具体混合了哪些数据集、比例如何，我无法逐项精确复述；但核心是上述 QA 数据集加远程监督。
+
+---
+
+## 2. ColBERT（ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT）
+
+**训练数据**
+- ColBERT 的主要训练数据是 MS MARCO。
+- 在段落检索任务中，它使用 MS MARCO 的查询-段落相关性判断进行训练。
+- 论文也涉及其他实验设置，但最核心、最常被引用的是 MS MARCO 上的训练。
+
+**标注需求**
+- 使用 MS MARCO 已有的人工/半人工相关性标注。
+- ColBERT 本身不强调新增人工标注；它的贡献主要在模型结构和延迟交互机制。
+- 训练时需要“查询-正段落”以及负例；负例可从其他查询的正段落中采样。
+
+**不确定点**
+- ColBERT 论文是否在某些实验中也使用了其他数据集（如 TREC 等）做训练或微调，我记不精确；但 MS MARCO 是其核心训练数据。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning for Dense Text Retrieval）
+
+**训练数据**
+- ANCE 主要在 MS MARCO 上训练。
+- 评估时常在 MS MARCO、Natural Questions、TriviaQA 等数据集上进行。
+- 它的核心不是换训练数据，而是换负例采样方式：从全库中近似最近邻里选“难负例”。
+
+**标注需求**
+- 训练依赖 MS MARCO 的相关性标注。
+- ANCE 不要求新增人工相关性标注。
+- 它的关键点是：随着模型更新，负例也从当前模型认为相似但实际不相关的文档中动态选取，从而缓解“假阴性”和训练/推理不一致问题。
+
+**不确定点**
+- ANCE 是否在所有实验中都只用 MS MARCO 训练，我无法百分百确认；但其主实验和核心方法确实以 MS MARCO 为主。
+
+---
+
+## 4. RocketQA（RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering）
+
+**训练数据**
+- RocketQA 主要在 MS MARCO 上训练。
+- 评估通常在 MS MARCO、Natural Questions、TriviaQA 等数据集上进行。
+- 它也可能利用 NQ、TriviaQA 等无标注或弱标注数据做伪标签训练，但核心训练集仍是 MS MARCO。
+
+**标注需求**
+- 使用 MS MARCO 已有的相关性标注。
+- RocketQA 不要求大量新增人工标注，而是通过以下方式提升数据利用率：
+  - 跨批次负例：增加每个查询的负例数量；
+  - 去噪：过滤伪标签中的噪声；
+  - 伪标签：用模型为无标注数据生成标签。
+- 因此它的标注需求可以概括为：依赖已有标注 + 自动生成/去噪伪标签，而非新增人工标注。
+
+**不确定点**
+- RocketQA 论文中伪标签数据的具体来源和规模，我记不精确；但“MS MARCO 为主 + 伪标签/去噪”这一框架是确定的。
+
+---
+
+## 对比总结
+
+1. **DPR**
+   - 数据：多个 QA 数据集（NQ、TriviaQA、WebQuestions、CuratedTREC、SQuAD 等）。
+   - 标注：利用“问题-答案”做远程监督，不需要段落相关性人工标注。
+   - 特点：标注成本低，但正例有噪声。
+
+2. **ColBERT**
+   - 数据：主要是 MS MARCO。
+   - 标注：使用 MS MARCO 已有相关性标注。
+   - 特点：不强调新标注，重点在模型结构。
+
+3. **ANCE**
+   - 数据：主要是 MS MARCO。
+   - 标注：使用 MS MARCO 已有相关性标注。
+   - 特点：不新增标注，重点在动态难负例采样。
+
+4. **RocketQA**
+   - 数据：主要是 MS MARCO，可能辅以伪标签数据。
+   - 标注：使用已有标注 + 自动伪标签/去噪。
+   - 特点：不要求新增人工标注，重点在负例构造、去噪和伪标签。
+
+---
+
+## 一句话回答
+
+DPR 用多个 QA 数据集的问题-答案对做远程监督，不需要段落相关性标注；ColBERT、ANCE、RocketQA 主要用 MS MARCO 的已有相关性标注，其中 ANCE 侧重动态难负例采样，RocketQA 侧重跨批次负例、去噪和伪标签，三者都不要求新增大规模人工相关性标注。

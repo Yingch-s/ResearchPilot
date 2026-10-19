@@ -1,0 +1,82 @@
+# A3 · b0 · round 1
+
+DPR、ColBERT、ANCE、RocketQA 各自的负样本（hard negative）策略是什么？
+
+---
+
+下面按 DPR、ColBERT、ANCE、RocketQA 四个工作分别说明它们的负样本/难负样本策略。我会尽量区分“训练时实际怎么采样”与“论文中强调的贡献”，并对不确定处标注。
+
+## 1. DPR（Dense Passage Retrieval, 2020）
+
+**核心策略：in-batch negatives + 少量 BM25 hard negatives。**
+
+- DPR 的基本训练方式是：对一个 batch 中的每个问题，把同 batch 内其他问题对应的正段落当作负样本，即 **in-batch negatives**。这样计算效率高，因为可以用矩阵乘法一次性得到 batch 内所有 question-passage 相似度。
+- 论文中还比较了加入 **BM25 hard negatives** 的效果：先用 BM25 检索出与问题相关但非答案的段落，作为额外负样本。DPR 的典型配置是每个问题配 1 个 BM25 hard negative，再结合 in-batch negatives。
+- 论文结论大致是：**BM25 hard negative 对性能有帮助，但并非越多越好**；单纯大量 hard negative 可能带来训练不稳定或过拟合。DPR 最终常用的是“in-batch negatives + 1 个 BM25 hard negative”这类设置。
+- 注意：DPR 的 hard negative 来自 **BM25 检索结果**，不是来自当前 dense retriever 自己在线挖掘的负样本。
+
+**不确定点：** DPR 论文不同实验设置中 hard negative 数量有变化；具体“最佳”配置依赖数据集和实现，不能一概而论。
+
+## 2. ColBERT（2020）
+
+**核心策略：in-batch negatives，且因 late interaction 结构可高效使用大量 in-batch negatives。**
+
+- ColBERT 的训练也使用 **in-batch negatives**：每个问题在 batch 内其他问题的正段落被视为负样本。
+- 它的一个关键点是：由于 ColBERT 使用 late interaction（MaxSim），可以对 batch 内所有 passage 的 token 表示进行预计算和复用，因此能承受较大的 batch size，从而获得较多 in-batch negatives。
+- ColBERT 原论文中并没有像 ANCE 那样强调“在线挖掘当前模型认为最难的负样本”作为核心机制。它更多强调 late interaction 架构与 in-batch negative 训练的效率。
+- 后续 ColBERT 相关工作中，也有使用 hard negative 的变体，但 **原始 ColBERT 论文的主要负样本策略是 in-batch negatives**。
+
+**不确定点：** ColBERT 原论文是否在某些实验里额外加入 BM25 hard negatives，我印象中不是其主要卖点；若需要精确到某张表或某组实验，建议查原文。
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning, 2021）
+
+**核心策略：用当前模型在线检索出的“近似最近邻”作为 hard negatives，即 model-based hard negatives。**
+
+- ANCE 的核心动机是：in-batch negatives 或固定 BM25 negatives 与当前模型学到的表示空间可能不匹配。真正对训练最有价值的负样本，应该是 **当前 dense retriever 自己认为相似、但实际不相关的段落**。
+- 因此 ANCE 使用 **ANN 索引**（如 FAISS）对训练语料做检索，把当前模型检索出的 top 非正例段落作为 hard negatives。
+- 这些负样本不是一次性预先挖好的，而是随着模型更新 **周期性/在线刷新**：模型变了，ANN 索引和负样本也更新。这被称为 “asynchronous” 或 “online” negative sampling。
+- 这样做的效果是：负样本难度与当前模型能力匹配，避免负样本过难或过易。
+- ANCE 还强调用 **缓存/异步更新** 来降低在线挖掘负样本的计算成本。
+
+**总结：** ANCE 的负样本策略是 **当前模型基于 ANN 检索出的 hard negatives，并随训练动态更新**。
+
+## 4. RocketQA（2021）
+
+**核心策略：cross-batch negatives + denoised hard negatives + 数据增强/伪标签等，整体是一套面向开放域问答的负样本与训练优化方案。**
+
+RocketQA 不是只提出一种负样本采样法，而是针对 dense retriever 训练中的几个问题提出组合策略：
+
+1. **Cross-batch negatives**
+   - 普通 in-batch negatives 只用一个 batch 内的负样本。
+   - RocketQA 使用 **cross-batch negatives**：维护一个负样本队列/缓存，让当前 batch 的问题可以使用之前 batch 中的段落作为负样本，从而显著增加负样本数量，尤其是当 batch size 受显存限制时。
+   - 这类似 MoCo 风格的队列机制，但用于文本检索训练。
+
+2. **Denoised hard negatives**
+   - 直接用 BM25 或模型检索出的 hard negative 可能包含“假阴性”：即表面不匹配但实际包含答案或与问题相关的段落。
+   - RocketQA 使用一个 **cross-encoder 或更强的判别模型** 对候选 hard negatives 进行过滤/去噪，去掉那些可能其实是正例的样本，再用于训练 dual-encoder。
+   - 这样可减少假阴性对训练的伤害。
+
+3. **数据增强 / 伪标签**
+   - RocketQA 还利用未标注语料，通过检索和筛选生成更多训练数据，包括正例和难负例。
+   - 它强调在无监督/半监督场景下，用强模型挖掘可靠训练信号。
+
+4. **与 ANCE 的区别**
+   - ANCE 主要强调“用当前 dual-encoder 的 ANN 结果作为动态 hard negatives”。
+   - RocketQA 更强调“cross-batch 大负样本池 + 去噪 hard negatives + 数据增强”的组合，且 hard negative 可来自 BM25、dual-encoder 或 ensemble，再经 cross-encoder 去噪。
+
+**不确定点：** RocketQA 有多个版本/后续工作（如 RocketQA v2、RocketQAv2），不同论文中具体负样本构造细节可能不同。上面是 RocketQA 初版及常见解读中的核心策略。
+
+## 简要对比表
+
+| 方法 | 主要负样本策略 | 是否在线/动态 | 关键特点 |
+|---|---|---|---|
+| DPR | in-batch negatives + BM25 hard negatives | 否，BM25 预先挖掘 | 简单有效，hard negative 数量不宜过多 |
+| ColBERT | in-batch negatives | 否 | 依赖 late interaction 和大 batch 提高负样本量 |
+| ANCE | 当前模型 ANN 检索出的 hard negatives | 是，动态更新 | 负样本与当前模型匹配，异步刷新索引 |
+| RocketQA | cross-batch negatives + 去噪 hard negatives + 数据增强 | 部分动态/队列机制 | 大负样本池 + 去噪，减少假阴性 |
+
+## 需要谨慎的地方
+
+- “hard negative”在不同论文中定义不完全一致：有的指 BM25 top 非正例，有的指当前 dense 模型 top 非正例，有的指经过 cross-encoder 过滤后的难负例。
+- 这些方法的实现细节常依赖代码库和实验设置，论文中的最佳配置不一定能直接复现。
+- 如果你需要，我可以进一步按“负样本来源、采样时机、是否去噪、batch 内/跨 batch”四个维度做更细的对比。

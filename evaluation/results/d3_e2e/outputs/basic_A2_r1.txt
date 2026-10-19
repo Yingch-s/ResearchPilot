@@ -1,0 +1,96 @@
+# A2 · basic · round 1
+
+这四篇论文（DPR、ColBERT、ANCE、RocketQA）分别使用了什么训练数据，标注需求有何不同？
+
+---
+
+# 四篇论文（DPR、ColBERT、ANCE、RocketQA）的训练数据与标注需求对比
+
+## 重要说明
+
+在回答之前需要指出：**检索到的资料片段主要涉及 RocketQA 和 ANCE，对 DPR 仅有零散提及，对 ColBERT 则完全没有涉及。** 因此，以下回答中：
+
+- 关于 **RocketQA**：资料较充分，可给出有依据的结论。
+- 关于 **ANCE**：资料有部分依据（BM25 warm up、DPR checkpoint 等）。
+- 关于 **DPR**：资料仅有间接提及（使用 BERTbase、BM25 negatives 可帮助训练），训练数据细节未在片段中出现。
+- 关于 **ColBERT**：**资料中完全未找到相关信息**，无法作答。
+
+---
+
+## 一、RocketQA（资料依据较充分）
+
+### 1. 训练数据
+根据片段1和片段2，RocketQA 的训练数据来源包括：
+
+- **有标注的训练数据**：用于训练 dual-encoder 的问答对（具体数据集名称在片段中未明确列出，但实验在 MSMARCO 和 Natural Questions 上进行，见片段2）。
+- **大规模无监督数据**：片段1明确指出 "RocketQA leverages large-scale unsupervised data 'labeled' by a cross-encoder for data augmentation"。即利用 cross-encoder 为无标注数据生成高质量的**伪标签（pseudo labels）**，再用于训练 dual-encoder。
+- **hard negatives**：通过 retriever 检索 top-ranked 结果，再用去噪（denoised）方式得到可靠的 hard negatives（片段1）。
+- **cross-batch negatives**：在训练中引入跨 batch 的负样本（片段1）。
+
+### 2. 标注需求
+RocketQA 的标注需求特点：
+
+- **减少对人工标注的依赖**：核心贡献之一就是用 cross-encoder 对无监督数据自动生成伪标签，从而做数据增强（片段1、片段2）。这意味着它**不需要对全部训练数据做人工标注**。
+- **需要去噪处理**：由于检索出的 top-ranked 结果可能包含 false negatives，RocketQA 引入 "denoised hard negatives" 来去除假负例，说明其对负样本质量有额外处理需求（片段1）。
+- **预训练语言模型**：主要使用 ERNIEbase，也测试过 BERTbase（片段4）。
+
+---
+
+## 二、ANCE（资料有部分依据）
+
+### 1. 训练数据
+根据片段3：
+
+- ANCE 在 TREC DL 上使用 **MARCO passage 训练数据**，并采用 **BM25 Warm Up** 设置，即先用 MARCO 官方的 BM25 negatives 训练（片段3："the DR models are first trained using MARCO official BM25 Negatives. ANCE is also warmed up by BM25 negatives"）。
+- 在 OpenQA 任务上，ANCE 使用 **DPR 发布的 checkpoint** 进行 warm up（片段3："we warm up ANCE using the released DPR checkpoints"）。
+- ANCE 使用 **RoBERTabase** 作为预训练语言模型（片段4）。
+
+### 2. 标注需求
+- 片段3提到 MARCO passage 训练标签被研究发现"cleaner"（Yan et al., 2019），说明 ANCE 依赖 MARCO 的标注数据。
+- ANCE 的核心思想是使用**动态/周期性更新的 hard negatives**（从模型自身检索结果中挖掘），但这一细节在提供的片段中**未直接出现**，属于该论文的常识性背景，此处不作展开以免超出资料依据。
+- 资料未明确说明 ANCE 是否需要额外的人工标注。
+
+---
+
+## 三、DPR（资料依据有限）
+
+### 1. 训练数据
+提供的片段中**没有直接说明 DPR 使用了什么训练数据**。仅有以下间接信息：
+
+- 片段3提到 "BM25 negatives can help train dense retrieval (Karpukhin et al., 2020; Luan et al., 2020)"，其中 Karpukhin et al., 2020 即 DPR 论文，说明 DPR 的训练中使用了 BM25 negatives。
+- 片段4提到 DPR 使用 **BERTbase** 作为预训练语言模型。
+
+### 2. 标注需求
+资料中**未找到**关于 DPR 标注需求的直接说明。根据常识，DPR 通常使用 Natural Questions、TriviaQA 等有标注问答数据集，但这**不在提供的资料片段中**，故不在此作为结论陈述。
+
+---
+
+## 四、ColBERT
+
+**资料中完全未找到关于 ColBERT 的任何信息**，包括其训练数据、标注需求、预训练模型等。无法作答。
+
+---
+
+## 五、汇总对比表
+
+| 论文 | 训练数据（资料依据） | 标注需求（资料依据） | 资料充分度 |
+|------|---------------------|---------------------|-----------|
+| DPR | 仅知使用 BM25 negatives（片段3）；预训练用 BERTbase（片段4） | 未找到 | 低 |
+| ColBERT | 未找到 | 未找到 | 无 |
+| ANCE | MARCO passage + BM25 warm up；OpenQA 用 DPR checkpoint warm up（片段3）；RoBERTabase（片段4） | 依赖 MARCO 较干净的标签（片段3） | 中 |
+| RocketQA | 有标注数据 + 大规模无监督数据（cross-encoder 生成伪标签）+ denoised hard negatives + cross-batch negatives（片段1、2） | 用伪标签减少人工标注；需去噪处理假负例（片段1） | 高 |
+
+---
+
+## 六、资料未覆盖的信息（明确说明）
+
+以下内容在提供的资料片段中**未找到**，不做推测：
+
+1. DPR 具体使用了哪些问答数据集（如 NQ、TriviaQA）及其规模。
+2. DPR 的标注需求细节。
+3. ColBERT 的全部相关信息（训练数据、标注需求、模型架构等）。
+4. ANCE 动态 hard negative 挖掘的具体机制与标注需求细节。
+5. RocketQA 具体使用的有标注数据集名称与规模。
+6. 四篇论文之间标注成本/人工标注量的定量对比。
+
+如需完整回答，建议补充检索 DPR（Karpukhin et al., 2020）和 ColBERT（Khattab & Zaharia, 2020）原文。

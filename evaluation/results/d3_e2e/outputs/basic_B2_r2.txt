@@ -1,0 +1,110 @@
+# B2 · basic · round 2
+
+DPR、ColBERT、ANCE、RocketQA 各自报告了怎样的资源需求（算力、索引体积的定性描述）？
+
+---
+
+以下按 DPR、ColBERT、ANCE、RocketQA 四个对象分别说明。先给结论：在你提供的这些片段中，**没有任何一段直接、系统地报告四者各自的算力需求或索引体积**；能提取到的多是训练策略、对比关系、效果与效率的定性表述。因此，很多问题只能回答“资料中未找到”，不能补造。
+
+---
+
+## 1. DPR
+
+**资料中有依据的结论：**
+- 片段2提到：DPR（Karpukhin et al., 2020）是 dense passage retriever 之一；DPR 与 ME-BERT 都使用 in-batch random sampling，以及从 BM25 检索结果中做 hard negative sampling。
+- 片段3提到：OpenQA 实验遵循 Karpukhin et al. (2020) 的 exact settings，说明 DPR 在该研究语境中是重要基线/设置来源。
+- 片段4提到：ANCE 在 OpenQA passage retrieval 上优于 DPR；并且用相同 reader 时，ANCE 更好的检索能带来更好的答案准确率。
+
+**关于资源需求：**
+- **算力需求：资料中未找到。**
+- **索引体积：资料中未找到。**
+- 只能间接推断：DPR 属于 dense retriever，通常需要编码 passage 并建立向量索引；但“通常需要”属于常识性推测，不是你给的资料中的明确结论。
+
+**推测：**
+- 从“dense passage retriever”这一类别可推测 DPR 需要将 passage 编码为向量并建索引，因此索引体积与向量维度、passage 数量、是否压缩等有关；但具体定性描述，资料未提供。
+
+---
+
+## 2. ColBERT
+
+**资料中有依据的结论：**
+- 片段5明确说：ColBERT 是基于 BERT 的 contextualized late interaction ranking model。
+- 它把 query 和 document 分别编码成两组 contextual embeddings。
+- relevance 用两组 embedding 之间的 cheap and pruning-friendly computations 来评估。
+- 目标是“fast computations that enable ranking without exhaustively evaluating every possible candidate”，即在排序时避免穷举所有候选。
+- 它试图调和 IR 中的 efficiency 与 contextualization。
+
+**关于资源需求：**
+- **算力需求：有定性依据。** ColBERT 强调 late interaction 和 cheap、pruning-friendly 的计算，以提升效率，避免对所有候选做 exhaustive evaluation。
+- **索引体积：资料中没有直接说索引体积大小。**
+- 但可依据“document 被编码成一组 contextual embeddings”做有限推断：它保存的不是单个 document 向量，而可能是多向量/ token 级表示，因此索引体积可能较大。不过这是**推测**，片段5没有明确比较索引体积。
+
+**推测：**
+- 由于 ColBERT 使用 late interaction，query 和 document 分别编码，且 document 侧是一组 contextual embeddings，通常意味着索引中要存比单向量 DPR 更多的向量表示，索引体积可能偏大；但资料未给出定量或明确体积描述。
+
+---
+
+## 3. ANCE
+
+**资料中有依据的结论：**
+- 片段2提到：ANCE（Xiong et al., 2020）是 dense passage retriever 之一；它通过使用 dense retriever 来增强 hard negative sampling。
+- 片段3提到：研究评估 ANCE 的更好检索是否能传播为更好的答案准确率，方法是在 ANCE 检索之上运行 RAG-Token 和 DPR Reader。
+- 片段4提到：
+  - ANCE 显著优于所有 sparse retrieval，包括 DeepCT。
+  - 在不同 negative construction mechanisms 中，ANCE 是唯一让 BERT-Siamese 在 document retrieval 中稳健超过 sparse methods 的方法。
+  - ANCE 在 OpenQA passage retrieval 上优于 DPR。
+  - ANCE 在 real production 中效果更明显，约有 15% relative gains。
+  - ANCE 更好的检索确实带来更好的 answer accuracy。
+
+**关于资源需求：**
+- **算力需求：资料中未找到明确描述。**
+- **索引体积：资料中未找到。**
+- 片段4的标题是 “EFFECTIVENESS AND EFFICIENCY”，但给出的内容主要是 effectiveness 和 production gains，没有具体说算力或索引体积。
+
+**推测：**
+- ANCE 使用 dense retriever 做 hard negative sampling，训练时可能比仅用 BM25 负例的 DPR 更复杂、更耗算力；但这是推测，资料未明确说。
+- 作为 dense retriever，ANCE 也需要向量索引；索引体积资料未提。
+
+---
+
+## 4. RocketQA
+
+**资料中有依据的结论：**
+- 片段1明确说：RocketQA 提出三种新训练策略来改进 open-domain QA 的 dense passage retrieval：
+  1. cross-batch negatives
+  2. denoised hard negatives
+  3. data augmentation
+- 片段2提到：RocketQA 与之前 state-of-the-art 方法比较，包括 sparse retrievers 和 dense retrievers；dense 基线包括 DPR、ME-BERT、ANCE。
+
+**关于资源需求：**
+- **算力需求：资料中未找到。**
+- **索引体积：资料中未找到。**
+- 只能看出 RocketQA 是 dense passage retrieval 方法，并提出训练策略改进；没有提及其训练算力、推理算力或索引体积。
+
+**推测：**
+- 由于引入 cross-batch negatives、denoised hard negatives、data augmentation，训练流程可能比普通 in-batch negative 训练更复杂，可能增加算力或数据处理开销；但这是推测，资料未明确。
+- 作为 dense retriever，RocketQA 大概率也需要 passage 向量索引；索引体积资料未提。
+
+---
+
+## 汇总表
+
+| 方法 | 资料中关于算力的依据 | 资料中关于索引体积的依据 | 备注 |
+|---|---|---|---|
+| DPR | 未找到 | 未找到 | 仅知是 dense retriever，用 in-batch random + BM25 hard negatives |
+| ColBERT | 有定性依据：late interaction、cheap、pruning-friendly、避免穷举候选 | 未直接找到；仅知 document 编码为 contextual embeddings 集合 | 索引体积可能较大属推测 |
+| ANCE | 未找到明确描述 | 未找到 | 资料强调效果、production gains、优于 DPR |
+| RocketQA | 未找到 | 未找到 | 仅知三种训练策略：cross-batch negatives、denoised hard negatives、data augmentation |
+
+---
+
+## 最终回答
+
+在你提供的资料片段范围内：
+
+- **DPR**：没有报告算力需求，也没有报告索引体积；只说明它是 dense passage retriever，使用 in-batch random sampling 和 BM25 hard negatives。
+- **ColBERT**：有关于效率的定性描述，即通过 late interaction 实现 cheap、pruning-friendly 的计算，避免穷举所有候选；但没有明确报告索引体积。其 document 侧为 contextual embeddings 集合，因此索引体积可能较大，但这只是推测。
+- **ANCE**：没有报告算力需求，也没有报告索引体积；资料主要说明其检索效果优于 sparse retrieval 和 DPR，并在 production 中约有 15% relative gains。
+- **RocketQA**：没有报告算力需求，也没有报告索引体积；资料只说明它提出三种训练策略来改进 dense passage retrieval。
+
+因此，若问题是“各自报告了怎样的资源需求（算力、索引体积的定性描述）”，严格依据这些片段，答案是：**四者中只有 ColBERT 对计算效率有明确定性的描述；DPR、ANCE、RocketQA 的算力与索引体积描述均未找到。索引体积方面，四者都没有明确资料依据。**

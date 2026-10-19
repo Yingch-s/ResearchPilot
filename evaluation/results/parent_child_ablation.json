@@ -1,0 +1,124 @@
+{
+ "summary": {
+  "chunk": {
+   "context_chars": 3623,
+   "answer_chars": 614,
+   "numeric_fidelity": 0.9
+  },
+  "parent": {
+   "context_chars": 19175,
+   "answer_chars": 890,
+   "numeric_fidelity": 0.952
+  }
+ },
+ "rows": [
+  {
+   "query": "DPR 的负样本策略具体是怎么做的？",
+   "mode": "chunk",
+   "context_chars": 2947,
+   "answer_chars": 271,
+   "llm_tokens": 817,
+   "numbers_in_answer": 2,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "DPR 的负样本策略具体是怎么做的？",
+   "mode": "parent",
+   "context_chars": 20252,
+   "answer_chars": 314,
+   "llm_tokens": 4836,
+   "numbers_in_answer": 3,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "ColBERT 的 late interaction 与 MaxSim 是什么关系？",
+   "mode": "chunk",
+   "context_chars": 3885,
+   "answer_chars": 923,
+   "llm_tokens": 1299,
+   "numbers_in_answer": 8,
+   "numeric_fidelity": 0.75
+  },
+  {
+   "query": "ColBERT 的 late interaction 与 MaxSim 是什么关系？",
+   "mode": "parent",
+   "context_chars": 28290,
+   "answer_chars": 1655,
+   "llm_tokens": 6423,
+   "numbers_in_answer": 9,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "ANCE 如何用 ANN 刷新全局难负例？",
+   "mode": "chunk",
+   "context_chars": 3155,
+   "answer_chars": 312,
+   "llm_tokens": 818,
+   "numbers_in_answer": 0,
+   "numeric_fidelity": null
+  },
+  {
+   "query": "ANCE 如何用 ANN 刷新全局难负例？",
+   "mode": "parent",
+   "context_chars": 15513,
+   "answer_chars": 753,
+   "llm_tokens": 3727,
+   "numbers_in_answer": 1,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "RocketQA 的去噪策略具体做了什么？",
+   "mode": "chunk",
+   "context_chars": 4906,
+   "answer_chars": 527,
+   "llm_tokens": 1301,
+   "numbers_in_answer": 2,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "RocketQA 的去噪策略具体做了什么？",
+   "mode": "parent",
+   "context_chars": 18531,
+   "answer_chars": 649,
+   "llm_tokens": 4191,
+   "numbers_in_answer": 2,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "四篇论文分别用什么训练数据集？",
+   "mode": "chunk",
+   "context_chars": 2841,
+   "answer_chars": 1333,
+   "llm_tokens": 1199,
+   "numbers_in_answer": 8,
+   "numeric_fidelity": 0.75
+  },
+  {
+   "query": "四篇论文分别用什么训练数据集？",
+   "mode": "parent",
+   "context_chars": 17194,
+   "answer_chars": 909,
+   "llm_tokens": 4352,
+   "numbers_in_answer": 12,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "RocketQA 与 DPR 在跨批负例上的区别？",
+   "mode": "chunk",
+   "context_chars": 4003,
+   "answer_chars": 321,
+   "llm_tokens": 1042,
+   "numbers_in_answer": 4,
+   "numeric_fidelity": 1.0
+  },
+  {
+   "query": "RocketQA 与 DPR 在跨批负例上的区别？",
+   "mode": "parent",
+   "context_chars": 15271,
+   "answer_chars": 1057,
+   "llm_tokens": 3617,
+   "numbers_in_answer": 7,
+   "numeric_fidelity": 0.714
+  }
+ ]
+}

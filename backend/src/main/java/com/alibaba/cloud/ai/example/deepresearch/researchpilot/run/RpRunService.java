@@ -209,6 +209,21 @@ public class RpRunService {
 		return RunStatus.valueOf(jdbc.queryForObject("SELECT status FROM rp_runs WHERE id = ?", String.class, runId));
 	}
 
+	/** P0-A：按归属读取 run —— 非本人（含不存在）一律 empty，调用方以 404 呈现。 */
+	public java.util.Optional<Map<String, Object>> loadRunForOwner(UUID runId, java.util.UUID ownerId) {
+		if (ownerId == null) {
+			return java.util.Optional.empty();
+		}
+		List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM rp_runs WHERE id = ? AND owner_user_id = ?",
+				runId, ownerId);
+		return rows.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(rows.get(0));
+	}
+
+	/** P0-A：创建路径的归属写入。 */
+	public void setOwner(UUID runId, java.util.UUID ownerId) {
+		jdbc.update("UPDATE rp_runs SET owner_user_id = ? WHERE id = ?", ownerId, runId);
+	}
+
 	public Map<String, Object> loadRun(UUID runId) {
 		return jdbc.queryForMap("SELECT * FROM rp_runs WHERE id = ?", runId);
 	}
@@ -524,8 +539,11 @@ public class RpRunService {
 			return false;
 		}
 		jdbc.update("DELETE FROM rp_reports WHERE run_id = ?", runId);
+		// I2：报告已删 → 缓存必须失效（重收敛生成新报告前避免陈旧命中）
+		com.alibaba.cloud.ai.example.deepresearch.researchpilot.obs.RpReportCache.evict(runId);
+		// I2：复活走准入 —— 落 QUEUED 由 sweeper 补位，不得直插 RESEARCHING 绕过并发限额
 		jdbc.update(
-				"UPDATE rp_runs SET status = 'RESEARCHING', budget_reason = NULL, pause_requested = FALSE, updated_at = now() WHERE id = ?",
+				"UPDATE rp_runs SET status = 'QUEUED', budget_reason = 'requeued: manual retry', pause_requested = FALSE, updated_at = now() WHERE id = ?",
 				runId);
 		events.log(runId, stepOf(runId, stepIndex), null, RpEventType.RUN_RESUMED, "RpRunService", null,
 				Map.of("manual_retry", true, "step_index", stepIndex));

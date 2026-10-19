@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS rp_runs (
     session_id       TEXT,
     query            TEXT NOT NULL,
     status           TEXT NOT NULL DEFAULT 'CREATED'
-        CHECK (status IN ('CREATED', 'PLANNING', 'WAITING_APPROVAL', 'RESEARCHING', 'VERIFYING',
+        CHECK (status IN ('CREATED', 'PLANNING', 'WAITING_APPROVAL', 'RESEARCHING', 'QUEUED', 'VERIFYING',
                           'FINALIZING', 'COMPLETED', 'PARTIAL_COMPLETED', 'FAILED', 'CANCELLED')),
     plan_id          UUID,
     plan_snapshot    JSONB,
@@ -403,3 +403,25 @@ CREATE TABLE IF NOT EXISTS rp_web_snapshots (
 CREATE INDEX IF NOT EXISTS idx_rp_web_snapshots_topic ON rp_web_snapshots(topic_id, fetched_at DESC);
 ALTER TABLE rp_web_snapshots ADD COLUMN IF NOT EXISTS extracted_text TEXT;
 ALTER TABLE rp_web_snapshots ADD COLUMN IF NOT EXISTS paper_id UUID REFERENCES rp_papers(id) ON DELETE SET NULL;
+
+-- P0-B：准入队列 FIFO 补位扫描（仅 QUEUED 行参与）
+CREATE INDEX IF NOT EXISTS idx_rp_runs_queued ON rp_runs (created_at) WHERE status = 'QUEUED';
+
+-- P0-A：多用户（schema 自包含 —— 新环境只起应用即可用，无需手工跑迁移）
+CREATE TABLE IF NOT EXISTS rp_users (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- admin 种子（占位哈希非合法 BCrypt，admin 不可登录；需要时 DBA 重置）
+INSERT INTO rp_users (username, password_hash, role)
+VALUES ('admin', '$2a$10$DISABLEDADMINACCOUNTDISABLEDADMINACCO', 'admin')
+ON CONFLICT (username) DO NOTHING;
+ALTER TABLE rp_topics ADD COLUMN IF NOT EXISTS owner_user_id UUID REFERENCES rp_users(id);
+ALTER TABLE rp_runs ADD COLUMN IF NOT EXISTS owner_user_id UUID REFERENCES rp_users(id);
+UPDATE rp_topics SET owner_user_id = (SELECT id FROM rp_users WHERE username = 'admin') WHERE owner_user_id IS NULL;
+UPDATE rp_runs SET owner_user_id = (SELECT id FROM rp_users WHERE username = 'admin') WHERE owner_user_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_rp_runs_owner ON rp_runs (owner_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rp_topics_owner ON rp_topics (owner_user_id);

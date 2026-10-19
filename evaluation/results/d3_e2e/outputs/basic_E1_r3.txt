@@ -1,0 +1,54 @@
+# E1 · basic · round 3
+
+RocketQA 的去噪（denoising）策略在论文的哪一部分？具体做了什么？
+
+---
+
+根据目前提供的资料片段，回答如下：
+
+## 一、RocketQA 去噪策略所在的论文部分
+
+**有依据的结论：**
+
+RocketQA 的“去噪”策略（denoised hard negatives）在资料中出现在以下部分：
+
+1. **摘要（Abstract）**：将其列为 RocketQA 的三大技术贡献之一，称为 “denoised hard negatives”。
+2. **引言（1 Introduction）**：作为第二项主要技术贡献被介绍，并给出了具体说明。
+
+资料片段中**没有**显示该策略出现在方法（Method）章节、实验（Experiment）章节等更具体的章节位置。因此，若问“具体在论文哪一节详细展开”，**资料中未找到**，无法确认。
+
+## 二、去噪策略具体做了什么
+
+**有依据的结论（来自片段2）：**
+
+> “Second, RocketQA introduces denoised hard negatives. It aims to remove false negatives from the top-ranked results retrieved by a retriever, and derive more reliable hard negatives.”
+
+即：
+
+- **目标**：从检索器返回的**排名靠前的结果**中**去除假负例（false negatives）**；
+- **目的**：从而得到**更可靠的硬负例（hard negatives）**。
+
+**背景动机（片段1、片段2）：**
+
+- 双编码器训练面临“存在未标注正例（unlabeled positives）”的挑战（片段1）；
+- 因此，直接用 top-ranked 结果当负例可能混入假负例，去噪就是为解决这一问题（片段2）。
+
+**推测（非资料原文）：**
+
+- 片段2提到用 cross-encoder 为无标注数据生成伪标签（片段2），但资料**未明确说明**去噪过程是否直接使用 cross-encoder 来判定/过滤假负例。因此“去噪是否借助 cross-encoder 实现”属于**推测**，资料中未找到直接依据。
+
+## 三、其他相关说明
+
+- 片段3、片段4、片段5 只是重复列出三大策略名称或说明实验有效性，**未提供去噪策略的额外细节**。
+- 资料中**未找到**去噪策略的具体算法步骤、阈值设定、过滤规则等实现细节。
+
+## 四、小结
+
+| 问题 | 结论 | 依据 |
+|---|---|---|
+| 去噪策略在论文哪一部分 | 摘要、引言中均有提及 | 片段1、2、3 |
+| 具体做什么 | 从检索器 top-ranked 结果中去除假负例，得到更可靠硬负例 | 片段2 |
+| 详细方法章节位置 | 未找到 | — |
+| 是否用 cross-encoder 去噪 | 未找到明确说明（属推测） | — |
+
+**总体而言**：资料能确认去噪策略的**名称、位置（摘要/引言）和目的**，但**无法确认其在论文中的详细展开章节及具体实现机制**。

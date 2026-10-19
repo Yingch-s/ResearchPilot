@@ -1,0 +1,99 @@
+# A4 · basic · round 2
+
+DPR、ColBERT、ANCE、RocketQA 各自的索引结构与检索效率特征是什么？
+
+---
+
+以下按 DPR、ColBERT、ANCE、RocketQA 四个对象分别说明。先给结论，再标注依据来源与推测边界。
+
+## 一、总体说明
+
+检索到的资料片段主要覆盖 **DPR、ANCE、RocketQA**，并且对它们的训练方式、负采样策略、检索效率有间接或直接描述；**ColBERT 在给定片段中未被提及**，因此其索引结构与检索效率特征无法从现有资料中得出，只能说明“未找到依据”，不做编造。
+
+---
+
+## 二、DPR
+
+### 1. 索引结构
+- **有依据的结论**：DPR 属于 dense passage retriever（稠密段落检索器），采用 **dual-encoder（双编码器）架构**学习问题和段落的稠密表示，用于语义匹配。  
+  - 依据：片段1指出“Typically, the dual-encoder architecture is adopted to learn dense representations of questions and passages for semantic matching.”；片段3将 DPR 列为 dense passage retriever 之一。
+- **有依据的结论**：DPR 使用 **in-batch random sampling**，并从 **BM25 检索结果中做 hard negative sampling**。  
+  - 依据：片段3：“Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25”。（原文写为 DRP，结合上下文应为 DPR）
+- **推测**：由于是 dual-encoder，通常问题与段落分别编码，段落向量可预先离线建索引，检索时对问题编码后做向量近邻搜索。但“具体索引类型（如 FAISS、IVF、HNSW 等）”在给定资料中未找到，不能确认。
+
+### 2. 检索效率特征
+- **有依据的结论**：DPR 是 ANCE 论文中的对比基线之一；ANCE 的实验表明，将 DPR 检索替换为 ANCE 后，可以评估检索提升是否能传递到答案准确率。  
+  - 依据：片段4：“by running the state-of-the-art systems' readers on top of ANCE instead of DPR retrieval”；片段5表4标题也说明“ANCE+Reader switches the retrieve of a system from DPR to ANCE”。
+- **有依据的结论**：DPR 的训练存在训练与推理不一致、未标注正例、训练数据有限等挑战。  
+  - 依据：片段1：“it is difficult to effectively train a dual-encoder due to the challenges including the discrepancy between training and inference, the existence of unlabeled positives and limited training data.”
+- **未找到**：DPR 的具体索引大小、检索延迟、QPS、内存占用等效率指标，在给定片段中没有直接数据。
+- **推测**：作为 dual-encoder dense retriever，其检索效率通常高于 cross-encoder 逐对打分，但低于纯稀疏检索如 BM25 的倒排索引；不过这是基于一般架构常识的推测，给定资料未直接支持。
+
+---
+
+## 三、ColBERT
+
+### 1. 索引结构
+- **未找到**：给定片段中完全没有出现 ColBERT。
+- **结论**：无法根据现有资料说明 ColBERT 的索引结构。
+
+### 2. 检索效率特征
+- **未找到**：给定片段中没有 ColBERT 的效率、延迟、索引压缩、late interaction 等信息。
+- **结论**：无法根据现有资料说明 ColBERT 的检索效率特征。
+
+> 说明：ColBERT 通常以 late interaction、多向量表示、倒排式或向量压缩索引著称，但这些均**不在给定资料中**，因此不写入“有依据结论”。
+
+---
+
+## 四、ANCE
+
+### 1. 索引结构
+- **有依据的结论**：ANCE 属于 dense passage retriever，与 DPR、ME-BERT 并列。  
+  - 依据：片段3：“The dense passage retrievers include DPR (Karpukhin et al., 2020), ME-BERT (Luan et al., 2020) and ANCE (Xiong et al., 2020).”
+- **有依据的结论**：ANCE 增强了 hard negative sampling，方式是 **使用 dense retriever 本身来获取/更新硬负例**，而不是仅依赖 BM25 的检索结果。  
+  - 依据：片段3：“ANCE enhances the hard negative sampling by using the dense retriever.”
+- **推测**：ANCE 仍是 dual-encoder 类稠密检索器，因此其索引结构大概率也是“段落向量离线索引 + 问题向量在线近邻搜索”。但具体索引实现、是否使用 FAISS、是否异步刷新索引等，给定资料未说明。
+
+### 2. 检索效率特征
+- **有依据的结论**：资料中有专门的效率表：  
+  - 片段5：“Table 5: Efficiency of ANCE Search and Training.”  
+  说明 ANCE 论文确实报告了搜索与训练效率。
+- **有依据的结论**：ANCE 的检索提升可以传递到下游 reader：在 NQ 上用 RAG-Token，在 TQA 上用 DPR Reader，将 DPR 检索替换为 ANCE 后评估答案准确率。  
+  - 依据：片段4、片段5。
+- **未找到**：Table 5 的具体数值未在片段中给出，因此无法说明 ANCE 的具体检索延迟、加速比、训练成本等。
+- **推测**：ANCE 通过 dense retriever 迭代挖掘硬负例，训练成本可能高于 DPR 的静态 BM25 硬负例；检索阶段若沿用相同 dual-encoder 索引，则在线检索效率可能与 DPR 接近。但这是推测，资料未直接确认。
+
+---
+
+## 五、RocketQA
+
+### 1. 索引结构
+- **有依据的结论**：RocketQA 是一种 **优化训练方法**，用于改进 dense passage retrieval；其目标仍是训练 **dual-encoder retriever**。  
+  - 依据：片段1：“we propose an optimized training approach, called RocketQA, to improving dense passage retrieval.”；片段2：“effectively train a dual-encoder retriever for open-domain QA”。
+- **有依据的结论**：RocketQA 使用 **cross-encoder 为大规模无监督数据生成伪标签**，再用这些数据训练 dual-encoder。  
+  - 依据：片段2：“RocketQA leverages large-scale unsupervised data 'labeled' by a cross-encoder ... for data augmentation ... utilize a cross-encoder to generate high-quality pseudo labels for unlabeled data which are used to train the dual-encoder retriever.”
+- **有依据的结论**：RocketQA 的三大技术贡献是：  
+  1. **cross-batch negatives**：增加每个问题的可用负例数量，缓解训练与推理不一致；  
+  2. **denoised hard negatives**：从检索器 top-ranked 结果中去除假负例，得到更可靠硬负例；  
+  3. **data augmentation**：用 cross-encoder 生成伪标签。  
+  - 依据：片段2。
+- **推测**：RocketQA 最终部署的检索器仍是 dual-encoder，因此其索引结构应与 DPR/ANCE 类似，即段落向量索引 + 问题向量检索。但给定资料没有描述其具体索引类型、是否使用特定向量库、是否多向量等。
+
+### 2. 检索效率特征
+- **有依据的结论**：RocketQA 在 MSMARCO 和 Natural Questions 上显著优于之前 SOTA；并证明基于 RocketQA retriever 可以提升端到端 QA 性能。  
+  - 依据：片段1。
+- **有依据的结论**：cross-encoder 虽然能力更强，但 **效率低**；RocketQA 用 cross-encoder 生成伪标签，而不是在推理时使用 cross-encoder。  
+  - 依据：片段2：“Though inefficient, the cross-encoder architecture has been found to be more capable than the dual-encoder architecture... Therefore, we utilize a cross-encoder to generate high-quality pseudo labels...”
+- **未找到**：RocketQA 的具体检索延迟、索引构建时间、QPS、内存等效率数据，在给定片段中没有。
+- **推测**：由于推理阶段使用 dual-encoder，RocketQA 的在线检索效率应接近一般 dual-encoder dense retriever；其额外成本主要在训练阶段的数据增强和 cross-encoder 伪标注。但这是推测，资料未直接给出效率数值。
+
+---
+
+## 六、横向对比小结
+
+| 对象 | 索引结构（有依据） | 检索效率（有依据） | 资料缺口 |
+|---|---|---|---|
+| DPR | dual-encoder dense retriever；in-batch random + BM25 hard negatives | 作为 ANCE 对比基线；训练存在训练/推理不一致等问题 | 具体索引类型、延迟、QPS 未找到 |
+| ColBERT | 未找到 | 未找到 | 全部未找到 |
+| ANCE | dense retriever；用 dense retriever 增强 hard negative sampling | 论文有“ANCE Search and Training”效率表；检索提升可传递到 reader | 具体效率数值未在片段中给出 |
+| RocketQA | 训练 dual-encoder；cross-encoder 生成伪标签；

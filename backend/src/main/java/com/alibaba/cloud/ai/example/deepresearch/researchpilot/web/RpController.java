@@ -1378,7 +1378,7 @@ public class RpController {
 			return error(HttpStatus.BAD_REQUEST, "INVALID_QUERY", "query 不能为空", false);
 		}
 		var candidates = retrieval.hybridRetrieve(req.topicId(), req.paperIds(), req.query(),
-				req.topK() == null ? 10 : req.topK(), true);
+				req.topK() == null ? 10 : req.topK(), true, req.channels());
 		var parentMap = req.withParents() != Boolean.FALSE
 				? retrieval.expandParents(candidates.stream().map(RpRetrievalService.Candidate::parentId).toList(),
 						req.topicId(), req.paperIds())
@@ -1407,7 +1407,7 @@ public class RpController {
 
 	public record RetrieveRequest(@JsonProperty("topic_id") String topicId,
 			@JsonProperty("paper_ids") List<String> paperIds, String query, @JsonProperty("top_k") Integer topK,
-			@JsonProperty("with_parents") Boolean withParents) {
+			@JsonProperty("with_parents") Boolean withParents, @JsonProperty("channels") List<String> channels) {
 	}
 
 	// ---------- 任务状态 ----------

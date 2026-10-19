@@ -1,0 +1,102 @@
+# A3 · b0 · round 2
+
+DPR、ColBERT、ANCE、RocketQA 各自的负样本（hard negative）策略是什么？
+
+---
+
+下面按 DPR、ColBERT、ANCE、RocketQA 四个工作分别说明它们的负样本（尤其是 hard negative）策略。我会尽量区分“论文中明确提出的做法”和“后续实现/复现中常见的做法”，对没有把握的地方会标注不确定。
+
+## 1. DPR（Dense Passage Retrieval, 2020）
+
+**论文中的负样本策略：**
+- DPR 的训练使用 **in-batch negatives** 作为主要负样本来源。即在一个 batch 内，其他 query 对应的正 passage 会被当作当前 query 的负样本。
+- 论文还系统比较了多种负样本设置：
+  - **Random negatives**：从语料中随机抽取 passage。
+  - **BM25 negatives**：用 BM25 检索出与 query 相关但非标注正例的 passage 作为负样本。
+  - **Gold / positive passages**：即每个 query 可能有多个标注正例。
+- 论文发现：**BM25 hard negatives 效果最好**，通常每个 query 配 1 个 BM25 负样本，再结合 in-batch negatives，就能取得很强效果。
+- 具体来说，DPR 的常见训练配置是：每个 query 有 1 个正 passage + 1 个 BM25 hard negative，其余负样本来自同一 batch 内其他 query 的正 passage。
+
+**小结：**
+DPR 的核心 hard negative 策略是 **BM25 检索出的高排名非正例 passage**，并辅以 in-batch negatives。它没有使用复杂的迭代式 hard negative mining。
+
+**不确定点：**
+不同复现版本对 BM25 negative 的数量、是否过滤假阴性等处理不完全一致；论文主体是每 query 1 个 BM25 negative。
+
+---
+
+## 2. ColBERT（2020）
+
+**论文中的负样本策略：**
+- ColBERT 原论文的训练也使用 **in-batch negatives**，但它的 late interaction 架构使得 batch 内负样本计算方式与 DPR 不同。
+- 论文中提到，ColBERT 训练时每个 query 配一个正 passage，batch 内其他 passage 作为负样本。
+- 对于 hard negative，ColBERT 原论文并没有像 ANCE 那样强调迭代式 hard negative mining。它更多依赖 **大 batch 的 in-batch negatives** 来提供足够强的训练信号。
+- 不过，ColBERT 的后续版本和 ColBERTv2 中，明确引入了 **hard negative mining**，通常使用已有检索器（如 ColBERT 自身或 BM25）检索出的高排名非正例作为 hard negatives。
+
+**小结：**
+- 原版 ColBERT：主要依赖 **in-batch negatives**，hard negative 不是核心创新点。
+- ColBERTv2 / 后续实践：使用 **检索器挖掘出的 hard negatives**，常配合去噪/蒸馏。
+
+**不确定点：**
+ColBERT 原论文是否在某个实验设置中显式加入 BM25 hard negatives，我印象中不是主要卖点；如果你需要精确到某张表，建议查原文第 4 节训练细节。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning, 2021）
+
+**论文中的负样本策略：**
+- ANCE 的核心贡献就是 **迭代式 hard negative mining**。
+- 它不使用静态的 BM25 negatives，而是 **用当前正在训练的检索器本身，对全语料做 ANN 检索，取出每个 query 的高排名非正例 passage 作为 hard negatives**。
+- 这些 hard negatives 会随着模型更新而重新挖掘，因此负样本难度会逐渐提高，避免一开始就引入太多假阴性或太难样本。
+- 具体流程大致是：
+  1. 用当前模型对训练 query 做 ANN 搜索。
+  2. 取 top-k 中不是标注正例的 passage 作为 hard negatives。
+  3. 用这些负样本更新模型。
+  4. 定期重新挖掘。
+- ANCE 还讨论了 **假阴性问题**，并采用了一些策略来缓解，比如只取一定排名范围内的负样本、使用 stale 负样本等。
+
+**小结：**
+ANCE 的 hard negative 策略是 **动态的、基于当前模型 ANN 检索结果的迭代式负采样**，这是它区别于 DPR 静态 BM25 negatives 的关键。
+
+**不确定点：**
+ANCE 具体实现中 top-k 的 k、重新挖掘频率、是否完全同步更新等细节，不同复现可能不同；论文中有给出推荐设置。
+
+---
+
+## 4. RocketQA（2021）
+
+**论文中的负样本策略：**
+- RocketQA 针对的是开放域问答中的段落检索，提出了多项训练改进，其中与负样本相关的主要有：
+  - **Cross-batch negatives**：不只是 batch 内负样本，还利用多个 GPU / 更大范围的其他 query 的正例作为负样本，扩大负样本数量。
+  - **Denoised hard negatives**：RocketQA 指出，直接用检索器挖掘出的 hard negatives 可能包含假阴性（即其实是正例但未标注）。因此它引入 **去噪策略**，例如用 cross-encoder 或更可靠的判断来过滤掉可能是正例的 hard negatives。
+  - **Data augmentation / 伪标签**：RocketQA 还使用未标注数据生成伪正例，再配合负样本训练。
+- 具体来说，RocketQA 的 hard negative 通常来自 **强检索器（如 RocketQA 自身或 BM25）检索出的高排名非正例**，但会经过 **去噪** 处理，以减少假阴性。
+- 它没有像 ANCE 那样完全依赖迭代式 ANN 挖掘作为唯一核心，而是更强调 **负样本去噪 + cross-batch negatives + 大规模训练**。
+
+**小结：**
+RocketQA 的负样本策略可以概括为：**cross-batch negatives + 去噪后的 hard negatives**。hard negatives 来自检索器挖掘，但重点创新在于去噪，而不是单纯挖掘。
+
+**不确定点：**
+RocketQA 论文中不同版本（v1/v2）和不同任务（段落检索 vs. 问答）的具体负样本配置有差异；如果你需要精确到某个实验，建议查对应章节。
+
+---
+
+## 横向对比简表
+
+| 方法 | 主要负样本来源 | 是否迭代挖掘 | 关键特点 |
+|---|---|---|---|
+| DPR | in-batch + BM25 hard negatives | 否 | 静态 BM25 负样本，简单有效 |
+| ColBERT | in-batch negatives（原版）；后续加 hard negatives | 原版否，后续是 | 大 batch in-batch 为主 |
+| ANCE | 当前模型 ANN 检索出的高排名非正例 | 是 | 迭代式 hard negative mining，核心贡献 |
+| RocketQA | cross-batch + 检索器挖掘的 hard negatives | 部分/是 | 强调去噪，减少假阴性 |
+
+---
+
+## 需要说明的不确定之处
+
+1. **ColBERT 原版是否使用 BM25 hard negatives**：我印象中不是核心设置，但不同复现可能加入。建议查原论文训练细节确认。
+2. **ANCE 的具体挖掘频率和 top-k**：论文有推荐值，但不同实现可能不同。
+3. **RocketQA 不同版本的负样本细节**：v1 和 v2、段落检索和问答任务之间可能有差异。
+4. **DPR 中 BM25 negative 的数量**：论文主体是每 query 1 个，但某些实验可能不同。
+
+如果你需要，我可以进一步帮你查证某一篇论文的具体章节或表格。

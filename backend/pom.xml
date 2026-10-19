@@ -78,6 +78,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+		<!-- P0-A：多用户鉴权（双模式，off 为默认） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
         <!-- ResearchPilot Phase B: 业务真值库（PostgreSQL）+ 摄取 Job 队列 -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
@@ -245,6 +251,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- P1-D：Prometheus 指标暴露 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
         <dependency>

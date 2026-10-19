@@ -12,9 +12,11 @@ class RpRetrievalCacheTest {
 	@Test
 	void cacheKeyIsStableForScopeOrderAndSeparatesIdentity() {
 		String first = RpRetrievalService.cacheKey("topic", List.of("b", "a"), "  compare   methods ", 5, false,
-				"rev-1");
-		String same = RpRetrievalService.cacheKey("topic", List.of("a", "b"), "compare methods", 5, false, "rev-1");
-		String changed = RpRetrievalService.cacheKey("topic", List.of("a", "b"), "compare methods", 5, false, "rev-2");
+				"rev-1", "bm25+dense");
+		String same = RpRetrievalService.cacheKey("topic", List.of("a", "b"), "compare methods", 5, false, "rev-1",
+				"bm25+dense");
+		String changed = RpRetrievalService.cacheKey("topic", List.of("a", "b"), "compare methods", 5, false, "rev-2",
+				"bm25+dense");
 
 		assertEquals(first, same);
 		assertNotEquals(first, changed);

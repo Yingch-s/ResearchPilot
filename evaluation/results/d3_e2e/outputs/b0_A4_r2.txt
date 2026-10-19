@@ -1,0 +1,123 @@
+# A4 · b0 · round 2
+
+DPR、ColBERT、ANCE、RocketQA 各自的索引结构与检索效率特征是什么？
+
+---
+
+下面按 **DPR、ColBERT、ANCE、RocketQA** 四个对象，分别说明它们的索引结构与检索效率特征。需要先说明：这四者并不是完全同一层面的对比对象——DPR/ANCE/RocketQA 主要是“双塔稠密检索 + 向量索引”路线，而 ColBERT 是“多向量/后期交互”路线。因此它们的索引结构和效率差异很大。
+
+---
+
+## 1. DPR（Dense Passage Retriever）
+
+**基本路线**：双塔（dual encoder）稠密检索。Query 和 Passage 分别用 BERT 编码成单个稠密向量，通常取 `[CLS]` 或池化向量，维度如 768。
+
+**索引结构**：
+- 每个 passage 编码为一个固定维度向量。
+- 建库时对所有 passage 向量建立 **向量索引**。
+- 原论文主要使用 **FAISS** 做近似最近邻搜索（ANN），常见配置包括 IVF、PQ、HNSW 等；具体使用哪种 FAISS 索引取决于实验设置。
+- 索引中一个 passage 对应一个向量，因此索引规模与 passage 数量线性相关，但常数较小。
+
+**检索效率特征**：
+- Query 编码一次，得到一个向量。
+- 检索时在 FAISS 中做一次 ANN 搜索，返回 top-k passage。
+- 效率很高，尤其适合大规模语料。
+- 缺点是单向量表示压缩了 passage 的细粒度信息，召回质量可能不如多向量/交互式方法。
+- 通常需要配合 hard negative mining 训练，否则效果受限。
+
+**不确定点**：
+- DPR 论文中不同实验使用的 FAISS 索引类型不完全统一；如果问“DPR 官方默认一定用哪种 FAISS 索引”，需要查具体代码/论文附录确认。
+
+---
+
+## 2. ColBERT
+
+**基本路线**：多向量表示 + 后期交互（late interaction）。Query 和 Document 都编码成多个 token 级向量，而不是单个向量。
+
+**索引结构**：
+- 每个 document 被编码为多个 token 向量，例如每个 token 一个 128 维向量。
+- 索引保存的是 **document 的 token 向量矩阵**，而不是单个 document 向量。
+- 原始 ColBERT 使用一种专门的 **倒排索引 + 向量压缩** 结构：
+  - 对每个 token 向量做量化/压缩；
+  - 建立 token 级别的倒排列表；
+  - 检索时先通过 query token 找候选 document，再做后期交互打分。
+- ColBERTv2 进一步引入残差压缩和去重优化，降低存储开销。
+- 也有后续工作用 PLAID 等更高效的索引/检索引擎。
+
+**检索效率特征**：
+- 检索质量通常优于单向量 DPR，因为保留了 token 级细粒度匹配。
+- 但索引体积显著更大：一个 document 对应几十到几百个向量。
+- 检索时需要进行后期交互：对候选 document 的每个 token 向量与 query token 向量做 MaxSim 计算，计算量比单向量内积大。
+- 原始 ColBERT 的检索延迟和存储成本都高于 DPR；ColBERTv2/PLAID 做了明显优化，但总体仍比单向量 ANN 更重。
+- 适合对效果要求高、且能接受更大索引和更高延迟的场景。
+
+**不确定点**：
+- ColBERT 不同版本（ColBERT、ColBERTv2、PLAID）的索引细节差异较大；如果问题特指“原始 ColBERT”，则主要是倒排 + 压缩 token 向量；如果指 ColBERTv2，则还涉及残差压缩和更复杂的索引组织。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Estimation）
+
+**基本路线**：本质上仍是双塔稠密检索，和 DPR 同属“单向量 + ANN 索引”路线。ANCE 的核心贡献不在索引结构，而在 **训练时使用近似最近邻负样本**，让模型不断适应当前索引下的 hard negatives。
+
+**索引结构**：
+- 与 DPR 类似：每个 passage 一个稠密向量。
+- 使用 ANN 索引，常见为 FAISS。
+- 索引会随着训练过程定期刷新，因为模型参数更新后，passage 向量表示会变化。
+- 因此 ANCE 的索引不是“建一次就不动”，而是训练中反复重建/更新。
+
+**检索效率特征**：
+- 推理阶段与 DPR 类似：query 编码一次，FAISS ANN 搜索一次。
+- 检索效率高，和 DPR 同一量级。
+- 主要开销在训练阶段：需要定期对全库 passage 重新编码并重建 ANN 索引，训练成本较高。
+- 优点是检索效果通常明显优于 DPR，因为它使用了更难的负样本。
+- 索引结构与 DPR 没有本质区别，效率特征也接近。
+
+**不确定点**：
+- ANCE 论文中具体使用的 FAISS 索引类型、刷新频率等，需要看论文和代码实现；不同复现可能不同。
+
+---
+
+## 4. RocketQA
+
+**基本路线**：百度提出的稠密检索系列方法，通常包括双塔检索器、cross-encoder 重排序、以及训练数据优化。RocketQA 不是单一模型，而是一套面向检索的系统性方法。
+
+**索引结构**：
+- 其检索阶段通常仍采用 **双塔稠密检索 + 向量索引**，与 DPR/ANCE 类似。
+- passage 编码为单个稠密向量，建立 ANN 索引，常见也是 FAISS 类索引。
+- RocketQA 的重点包括：
+  - 使用 cross-batch negative sampling；
+  - 去噪训练数据；
+  - 用 cross-encoder 做重排序；
+  - 可能采用多阶段检索 pipeline。
+- 因此索引结构本身不是 RocketQA 的主要创新点，更多是训练方法和系统 pipeline 的优化。
+
+**检索效率特征**：
+- 第一阶段双塔检索效率与 DPR/ANCE 接近，属于高效 ANN 检索。
+- 如果包含 cross-encoder 重排序阶段，则整体延迟会增加，因为 cross-encoder 需要对 query-passage 对做完整交互编码，计算量远大于双塔内积。
+- 因此 RocketQA 的“检索效率”要分阶段看：
+  - 召回阶段：高效，类似 DPR；
+  - 重排阶段：较慢，但通常只对少量候选做。
+- 整体系统在效果和效率之间做权衡，适合工业级检索 pipeline。
+
+**不确定点**：
+- RocketQA 有多个版本和变体（如 RocketQA v1/v2、RocketQAv2 等），不同版本在索引、训练、重排上的具体实现可能不同。
+- 如果问“RocketQA 是否一定使用 FAISS”或“是否一定包含 cross-encoder 重排”，需要看具体版本和实验设置，不能一概而论。
+
+---
+
+## 5. 横向对比总结
+
+| 方法 | 索引结构 | 每篇文档向量数 | 检索效率 | 主要特点 |
+|---|---|---|---|---|
+| DPR | 单向量 + FAISS ANN | 1 | 高 | 经典双塔稠密检索 |
+| ColBERT | 多 token 向量 + 倒排/压缩索引 | 多 | 中到低 | 后期交互，效果好但索引大 |
+| ANCE | 单向量 + FAISS ANN，训练中刷新 | 1 | 高 | 用 ANN 负样本训练，提升效果 |
+| RocketQA | 单向量 + ANN，可能加重排 | 1（召回阶段） | 召回高，重排较慢 | 系统化训练 + 重排 pipeline |
+
+**核心结论**：
+- 如果只看索引结构和召回效率：**DPR、ANCE、RocketQA 的召回阶段都属于单向量 ANN 路线，效率高；ColBERT 属于多向量后期交互路线，索引更大、检索更慢，但通常效果更好。**
+- ANCE 和 RocketQA 的主要创新不在索引结构，而在训练方法、负样本构造和系统 pipeline。
+- ColBERT 的索引结构和效率特征与另外三者差异最大。
+
+如果你需要，我可以进一步按“存储开销、延迟、召回率、是否支持端到端训练”等维度做更细的对比表。

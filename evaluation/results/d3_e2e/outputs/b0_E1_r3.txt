@@ -1,0 +1,34 @@
+# E1 · b0 · round 3
+
+RocketQA 的去噪（denoising）策略在论文的哪一部分？具体做了什么？
+
+---
+
+RocketQA 的去噪（denoising）策略主要出现在论文 **《RocketQA: An Optimized Training Approach for Dense Passage Retrieval》**（EMNLP 2021）的 **第 3 节 “Approach”** 中，更具体地说是在 **3.2 小节 “Denoising Hard Negatives”**（不同版本排版可能略有差异，但标题基本是 Denoising / Denoised Hard Negatives）。它属于 RocketQA 训练流程中“构造更强负例”的核心环节之一。
+
+具体做法可以概括为：
+
+1. **背景问题**  
+   在 dense passage retrieval 中，训练通常需要正例和负例。若直接用 BM25 等传统检索器挖出的 hard negative，往往包含“假阴性”（false negative）：这些段落其实与问题相关，只是没有被标注为正例。把假阴性当负例训练，会伤害模型。
+
+2. **用 cross-encoder 做去噪**  
+   RocketQA 使用一个 cross-encoder（论文中常称为 cross-encoder reranker）来评估 query 与候选段落的相关性。cross-encoder 同时输入 query 和 passage，输出相关性分数，通常比 dual-encoder 更准确。
+
+3. **对未标注段落进行筛选**  
+   对于从检索中得到的未标注候选段落，先用 cross-encoder 打分。  
+   - 如果分数很高，说明它很可能是假阴性，即实际上相关但未标注；  
+   - 这类段落不应作为负例，甚至可以被当作正例使用。  
+   - 如果分数较低，才保留为负例。
+
+4. **与正例一起训练 dual-encoder**  
+   去噪后的负例，加上原始标注正例，以及可能被 cross-encoder 判定为高分的未标注段落（作为额外正例），一起用于训练 dual-encoder。这样能减少假阴性噪声，提升检索器效果。
+
+5. **在整体流程中的位置**  
+   RocketQA 的训练流程大致包括：
+   - 用 BM25 等挖负例；
+   - 用 cross-encoder 去噪；
+   - 用去噪后的数据训练 dual-encoder；
+   - 再迭代挖负例、去噪、训练。  
+   所以去噪策略是连接“负例挖掘”和“dual-encoder 训练”的关键步骤。
+
+需要说明的是：我手头没有论文原文逐字核对，以上是基于我对 RocketQA 论文内容的记忆。小节编号和具体措辞可能因论文版本（arXiv、EMNLP 正式版）略有差异；如果你需要精确到页码或原文句子，建议直接查论文第 3 节，尤其是 3.2 附近。

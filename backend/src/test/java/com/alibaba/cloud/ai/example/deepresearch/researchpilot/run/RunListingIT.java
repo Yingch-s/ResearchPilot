@@ -18,6 +18,11 @@ class RunListingIT {
 
 	private static RunListingService listing;
 
+	/** P0-A：owner 过滤下的测试归属 = admin（与 off 模式一致）。 */
+	private static UUID adminOwner() {
+		return jdbc.queryForObject("SELECT id FROM rp_users WHERE username = 'admin'", UUID.class);
+	}
+
 	@BeforeAll
 	static void setup() {
 		var ds = new DriverManagerDataSource(TestDatabase.url(), "researchpilot", "researchpilot");
@@ -39,19 +44,20 @@ class RunListingIT {
 			for (int i = 0; i < 3; i++) {
 				UUID id = UUID.randomUUID();
 				jdbc.update(
-						"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, created_at) VALUES (?, ?, ?, ?, 'COMPLETED', ?::timestamptz)",
-						id, "list-" + id, topic, "q" + i, "2026-01-01T00:00:0" + i + "Z");
+						"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, created_at, owner_user_id) VALUES (?, ?, ?, ?, 'COMPLETED', ?::timestamptz, ?)",
+						id, "list-" + id, topic, "q" + i, "2026-01-01T00:00:0" + i + "Z", adminOwner());
 			}
 			UUID foreign = UUID.randomUUID();
 			jdbc.update(
-					"INSERT INTO rp_runs (id, thread_id, topic_id, query, status) VALUES (?, ?, ?, 'foreign', 'COMPLETED')",
-					foreign, "list-" + foreign, other);
-			var first = listing.page(topic, 2, null, null, false);
+					"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, owner_user_id) VALUES (?, ?, ?, 'foreign', 'COMPLETED', ?)",
+					foreign, "list-" + foreign, other, adminOwner());
+			var first = listing.page(adminOwner(), topic, 2, null, null, false);
 			assertEquals(2, ((java.util.List<?>) first.get("items")).size());
 			assertTrue((Boolean) first.get("has_more"));
 			@SuppressWarnings("unchecked")
 			var cursor = (java.util.Map<String, Object>) first.get("next_cursor");
-			var second = listing.page(topic, 2, java.time.OffsetDateTime.parse(cursor.get("before_time").toString()),
+			var second = listing.page(adminOwner(), topic, 2,
+					java.time.OffsetDateTime.parse(cursor.get("before_time").toString()),
 					UUID.fromString(cursor.get("before_id").toString()), false);
 			assertEquals(1, ((java.util.List<?>) second.get("items")).size());
 			assertFalse(((java.util.List<?>) second.get("items")).stream()
@@ -71,23 +77,25 @@ class RunListingIT {
 			for (int i = 1; i <= 4; i++) {
 				UUID id = UUID.fromString("00000000-0000-0000-0000-" + String.format("%012d", i));
 				jdbc.update(
-						"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, created_at) VALUES (?, ?, ?, ?, 'COMPLETED', '2026-01-01'::timestamptz)",
-						id, "ties-" + id, topic, "q" + i);
+						"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, created_at, owner_user_id) VALUES (?, ?, ?, ?, 'COMPLETED', '2026-01-01'::timestamptz, ?)",
+						id, "ties-" + id, topic, "q" + i, adminOwner());
 			}
-			var first = listing.page(topic, 2, null, null, false);
+			var first = listing.page(adminOwner(), topic, 2, null, null, false);
 			@SuppressWarnings("unchecked")
 			var cursor = (java.util.Map<String, Object>) first.get("next_cursor");
 			UUID newId = UUID.randomUUID();
 			jdbc.update(
-					"INSERT INTO rp_runs (id, thread_id, topic_id, query, status) VALUES (?, ?, ?, 'new', 'RESEARCHING')",
-					newId, "list-new-" + newId, topic);
-			var second = listing.page(topic, 2, java.time.OffsetDateTime.parse(cursor.get("before_time").toString()),
+					"INSERT INTO rp_runs (id, thread_id, topic_id, query, status, owner_user_id) VALUES (?, ?, ?, 'new', 'RESEARCHING', ?)",
+					newId, "list-new-" + newId, topic, adminOwner());
+			var second = listing.page(adminOwner(), topic, 2,
+					java.time.OffsetDateTime.parse(cursor.get("before_time").toString()),
 					UUID.fromString(cursor.get("before_id").toString()), false);
 			@SuppressWarnings("unchecked")
 			var rows = (java.util.List<java.util.Map<String, Object>>) second.get("items");
 			assertEquals(java.util.List.of("q2", "q1"), rows.stream().map(r -> r.get("query")).toList());
 			assertFalse((Boolean) second.get("has_more"));
-			assertEquals(1, ((java.util.List<?>) listing.page(topic, 20, null, null, true).get("items")).size());
+			assertEquals(1,
+					((java.util.List<?>) listing.page(adminOwner(), topic, 20, null, null, true).get("items")).size());
 		}
 		finally {
 			jdbc.update("DELETE FROM rp_runs WHERE topic_id = ?", topic);
@@ -98,11 +106,11 @@ class RunListingIT {
 	@Test
 	void invalidLimitsAndIncompleteCursorsAreRejected() {
 		assertThrows(org.springframework.web.server.ResponseStatusException.class,
-				() -> listing.page(null, 0, null, null, false));
+				() -> listing.page(adminOwner(), null, 0, null, null, false));
 		assertThrows(org.springframework.web.server.ResponseStatusException.class,
-				() -> listing.page(null, 101, null, null, false));
+				() -> listing.page(adminOwner(), null, 101, null, null, false));
 		assertThrows(org.springframework.web.server.ResponseStatusException.class,
-				() -> listing.page(null, 20, java.time.OffsetDateTime.now(), null, false));
+				() -> listing.page(adminOwner(), null, 20, java.time.OffsetDateTime.now(), null, false));
 	}
 
 }

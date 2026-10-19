@@ -1,0 +1,111 @@
+# B1 · basic · round 1
+
+对比 DPR、ColBERT、ANCE、RocketQA 的训练配置全貌：训练数据、负样本策略、蒸馏/数据增强。
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 训练配置对比
+
+## 重要说明
+
+在回答之前，需要先说明一个关键限制：**本次提供的资料片段中，没有出现任何关于 ColBERT 的内容**，也没有 DPR 原始论文的独立片段（DPR 仅作为被引用对象出现在片段1、片段4中）。因此，对于 ColBERT 我只能明确说明"未找到依据"，对于 DPR 也只能基于片段中的间接引用进行有限说明。以下严格区分"有依据"与"推测/未找到"。
+
+---
+
+## 一、DPR（Dense Passage Retriever）
+
+**资料中有依据的结论：**
+
+1. **预训练语言模型**：片段4明确指出 "DPR (Karpukhin et al., 2020) uses BERT_base"。即 DPR 使用 BERT_base 作为编码器初始化。
+2. **负样本策略（间接）**：片段1提到 "BM25 negatives can help train dense retrieval (Karpukhin et al., 2020; Luan et al., 2020)"，说明 DPR 的工作与"BM25 负样本有助于训练稠密检索"这一结论相关，但片段并未直接描述 DPR 自身的负样本采样细节（如 in-batch negatives、hard negatives 的具体构造）。
+3. **训练数据（间接）**：片段1提到 "MARCO passage training labels cleaner (Yan et al., 2019)"，并说明 TREC DL 实验中所有 DR 模型从 RoBERTa base 微调，且包含 "BM25 Warm Up" 设置。但这是该片段作者（RocketQA 相关实验）的做法，**不能直接等同于 DPR 原始论文的训练数据配置**。
+
+**资料中未找到的信息：**
+- DPR 的具体训练数据集（如 NQ、TriviaQA、WebQuestions 等的使用方式）
+- DPR 的 in-batch negatives 具体数量、是否使用 hard negatives
+- DPR 是否使用蒸馏或数据增强
+
+**推测（明确标注为推测）：** 根据片段1的引用语境，DPR 很可能使用了 BM25 负样本作为训练信号之一，但这属于间接推断，非片段直接陈述。
+
+---
+
+## 二、ColBERT
+
+**资料中未找到的信息：**
+
+提供的 5 个片段中**完全没有出现 ColBERT**。因此：
+
+- ColBERT 的训练数据：未找到
+- ColBERT 的负样本策略：未找到
+- ColBERT 的蒸馏/数据增强：未找到
+
+我无法基于现有资料对 ColBERT 做任何有依据的说明，也不应编造。若需要，建议补充 ColBERT 原始论文（Khattab & Zaharia, 2020）的片段。
+
+---
+
+## 三、ANCE
+
+**资料中有依据的结论：**
+
+1. **预训练语言模型**：片段4指出 "ANCE (Xiong et al., 2020) uses RoBERTa_base"。
+2. **负样本策略（BM25 预热）**：片段1明确说明 "ANCE is also warmed up by BM25 negatives"，即在 TREC DL 实验中，ANCE 先用 MARCO 官方 BM25 负样本进行预热训练。
+3. **OpenQA 场景的初始化**：片段1指出 "In OpenQA, we warm up ANCE using the released DPR checkpoints (Karpukhin et al., 2020)"，即 ANCE 在 OpenQA 任务中使用 DPR 发布的 checkpoint 进行预热。
+4. **ANCE 的核心机制（间接）**：ANCE 以"近似最近邻负样本"著称（名称即 Approximate Nearest Neighbor Negative Contrastive Estimation），但**片段中并未直接描述其负样本刷新机制**，仅提到 BM25 预热。
+
+**资料中未找到的信息：**
+- ANCE 的具体训练数据集
+- ANCE 的负样本刷新频率、候选池大小等细节
+- ANCE 是否使用蒸馏或数据增强
+
+**推测（明确标注为推测）：** 结合片段1"BM25 Warm Up"的描述，ANCE 的训练流程可能是"BM25 负样本预热 → 自身检索器挖掘的近似负样本"，但片段未直接证实后半部分。
+
+---
+
+## 四、RocketQA
+
+**资料中有依据的结论（片段2、3、5 信息最丰富）：**
+
+1. **三大核心训练策略**（片段2、3、5一致）：
+   - **Cross-batch negatives（跨批次负样本）**：相比 in-batch negatives，增加每个问题可用的负样本数量，并缓解训练与推理之间的差异。
+   - **Denoised hard negatives（去噪硬负样本）**：从检索器 top-ranked 结果中移除假负样本（false negatives），得到更可靠的硬负样本。
+   - **Data augmentation（数据增强）**：利用 cross-encoder 对大规模无监督数据生成高质量伪标签，用于训练 dual-encoder 检索器。
+
+2. **蒸馏/数据增强的具体机制**（片段2）：RocketQA 使用 cross-encoder 为无标签数据生成高质量伪标签（pseudo labels），再用于训练 dual-encoder。这本质上是一种**跨架构蒸馏 + 数据增强**的结合。片段2还指出 cross-encoder 在理论和实践上都比 dual-encoder 更强（引用 Luan et al., 2020），但效率低，因此用作"教师"。
+
+3. **预训练语言模型**（片段4）：RocketQA 主要使用 **ERNIE_base**；作为对比实验，也用 BERT_base 替换 ERNIE_base，性能略降（MSMARCO MRR@10 降约 0.6，NQ R@100 降约 1.6）。片段4还指出，仅用 cross-batch negatives 训练的 RocketQA 已可与 DPR、ANCE、ME-BERT 相比（尽管后者用了更好的预训练 LM）。
+
+4. **训练数据（间接）**：片段1提到 TREC DL 实验中包含 "BM25 Warm Up" 设置，所有 DR 模型从 RoBERTa base 微调，并使用 MARCO 官方 BM25 负样本。但这是该实验的设置，**RocketQA 原始论文的训练数据细节（如是否用 MARCO、NQ 等）在片段中未完整给出**。
+
+**资料中未找到的信息：**
+- RocketQA 的具体训练数据集规模与来源
+- Cross-batch negatives 的具体 batch 大小、跨批次数量
+- Denoised hard negatives 的去噪阈值/过滤规则
+- Cross-encoder 教师模型的具体架构与训练细节
+
+---
+
+## 五、汇总对比表
+
+| 维度 | DPR | ColBERT | ANCE | RocketQA |
+|---|---|---|---|---|
+| 预训练 LM | BERT_base（片段4，有依据） | 未找到 | RoBERTa_base（片段4，有依据） | ERNIE_base 为主，BERT_base 为对比（片段4，有依据） |
+| 训练数据 | 未找到（片段仅间接提及 MARCO/BM25 相关） | 未找到 | 未找到（片段仅提及 OpenQA 用 DPR checkpoint 预热） | 未找到（片段仅提及 cross-encoder 伪标签用于无监督数据） |
+| 负样本策略 | 间接提及 BM25 negatives 有帮助（片段1） | 未找到 | BM25 预热（片段1，有依据）；ANN 负样本机制未在片段中描述 | Cross-batch negatives + Denoised hard negatives（片段2、3、5，有依据） |
+| 蒸馏/数据增强 | 未找到 | 未找到 | 未找到 | Cross-encoder 生成伪标签做数据增强（片段2，有依据），本质为跨架构蒸馏 |
+
+---
+
+## 六、结论与资料缺口
+
+**有依据的核心结论：**
+- RocketQA 的三大策略（cross-batch negatives、denoised hard negatives、cross-encoder 伪标签数据增强）在片段中有明确、反复的陈述。
+- ANCE 使用 BM25 负样本预热，OpenQA 场景用 DPR checkpoint 初始化。
+- DPR 用 BERT_base，ANCE 用 RoBERTa_base，RocketQA 主要用 ERNIE_base。
+
+**主要资料缺口：**
+1. **ColBERT 完全缺失**，无法做任何有依据的对比。
+2. DPR、ANCE、RocketQA 的**具体训练数据集**在片段中均未完整给出。
+3. DPR 和 ANCE 的**蒸馏/数据增强**策略在片段中未找到。
+4. ANCE 的 ANN 负样本刷新机制、RocketQA 的去噪阈值等**关键超参数**未找到。
+
+如需完整对比，建议补充 ColBERT 原始论文片段，以及 DPR、ANCE 论文中关于训练数据与负样本构造的原文段落。

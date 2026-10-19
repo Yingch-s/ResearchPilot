@@ -3,6 +3,7 @@ import Home from './views/Home.vue'
 import Workspace from './views/Workspace.vue'
 import SharedReport from './views/SharedReport.vue'
 import Settings from './views/Settings.vue'
+import Login from './views/Login.vue'
 import Prototype from './views/Prototype.vue'
 
 const router = createRouter({
@@ -13,6 +14,7 @@ const router = createRouter({
       !['null', 'undefined'].includes(String(to.params.topicId)) ? true : '/' },
     { path: '/shared/:token', component: SharedReport },
     { path: '/settings', component: Settings },
+    { path: '/login', component: Login },
     { path: '/prototype', redirect: '/prototype/home' },
     { path: '/prototype/:view(home|quick|deep)', component: Prototype }
   ]

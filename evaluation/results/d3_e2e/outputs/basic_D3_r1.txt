@@ -1,0 +1,168 @@
+# D3 · basic · round 1
+
+四篇论文各自的通讯作者所属大学是哪所、建校年份是什么？
+
+---
+
+根据目前提供的资料片段，只能对部分论文的通讯作者及所属大学作出有限判断；其中“通讯作者所属大学”和“建校年份”大多没有直接给出。以下逐篇说明。
+
+---
+
+## 1. RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering
+
+**资料中有依据的信息：**
+- 片段2给出作者邮箱：
+  - `{quyingqi, dingyuchen, liujing46, liukai20, dongdaxiang, wu_hua, wanghaifeng}@baidu.com`
+  - `reyon.ren@ruc.edu.cn`
+  - `batmanfly@gmail.com`
+- 片段5给出作者单位：
+  - 1 Baidu Inc.
+  - 2 Gaoling School of Artificial Intelligence, Renmin University of China
+- 片段5中标注：
+  - Jing Liu 1∗
+  - Ruiyang Ren 2†
+  - Wayne Xin Zhao 2∗
+
+**可推断的信息：**
+- 带 `∗` 的通常可能是通讯作者。片段5中 Jing Liu 和 Wayne Xin Zhao 都带 `∗`。
+- Jing Liu 属于 Baidu Inc.，不是大学。
+- Wayne Xin Zhao 属于 Renmin University of China（中国人民大学）下属高瓴人工智能学院。
+- 因此，若以 Wayne Xin Zhao 为通讯作者，则其所属大学是 **中国人民大学**。
+
+**建校年份：**
+- 资料片段中未提供中国人民大学的建校年份。
+- 因此：**未找到，不能根据现有资料确认。**
+
+**结论：**
+- 通讯作者所属大学：若按 Wayne Xin Zhao 判断，为 **中国人民大学**；但资料中未明确写“通讯作者”定义，只能依据 `∗` 推测。
+- 建校年份：**资料中未找到。**
+
+---
+
+## 2. Dense Passage Retrieval for Open-Domain Question Answering
+
+**资料中有依据的信息：**
+- 片段3给出作者与单位：
+  - Facebook AI
+  - †University of Washington
+  - ‡Princeton University
+- 作者包括：
+  - Vladimir Karpukhin∗
+  - Barlas Oğuz∗
+  - Sewon Min†
+  - Patrick Lewis
+  - Ledell Wu
+  - Sergey Edunov
+  - Danqi Chen‡
+  - Wen-tau Yih
+- 邮箱：
+  - `{vladk, barlaso, plewis, ledell, edunov, scottyih}@fb.com`
+  - `sewon@cs.washington.edu`
+  - `danqic@cs.princeton.edu`
+
+**可推断的信息：**
+- 带 `∗` 的作者是 Vladimir Karpukhin 和 Barlas Oğuz，二人邮箱均为 `@fb.com`，所属为 Facebook AI。
+- Facebook AI 不是大学。
+- 带 `†` 的 Sewon Min 属于 University of Washington。
+- 带 `‡` 的 Danqi Chen 属于 Princeton University。
+- 但资料没有明确说明谁是“通讯作者”。如果按常见标注习惯，`∗` 可能表示同等贡献，不一定表示通讯作者。
+- 因此，不能可靠判断通讯作者是谁，也不能可靠判断通讯作者所属大学。
+
+**建校年份：**
+- 资料中未提供 University of Washington 或 Princeton University 的建校年份。
+- 因此：**未找到。**
+
+**结论：**
+- 通讯作者所属大学：**资料中未明确通讯作者，无法可靠判断。**
+- 若仅看作者单位，涉及 Facebook AI、University of Washington、Princeton University，但 Facebook AI 不是大学。
+- 建校年份：**资料中未找到。**
+
+---
+
+## 3. APPROXIMATE NEAREST NEIGHBOR NEGATIVE CONTRASTIVE LEARNING FOR DENSE TEXT RETRIEVAL
+
+**资料中有依据的信息：**
+- 片段4给出：
+  - 作者：Lee Xiong∗, Chenyan Xiong∗, Ye Li, Kwok-Fung Tang, Jialin Liu, Paul Bennett, Junaid Ahmed, Arnold Overwijk
+  - 单位：Microsoft
+  - 邮箱：`lexion, chenyan.xiong, yeli1, kwokfung.tang, jialliu, paul.n.bennett, jahmed, arnold.overwijk@microsoft.com`
+- Lee Xiong 和 Chenyan Xiong 带 `∗`。
+
+**可推断的信息：**
+- 带 `∗` 的作者可能具有特殊角色，但资料未说明 `∗` 是否代表通讯作者。
+- 所有作者单位均为 Microsoft。
+- Microsoft 不是大学。
+- 因此，若通讯作者是 Lee Xiong 或 Chenyan Xiong，其所属机构是 Microsoft，不是大学。
+
+**建校年份：**
+- Microsoft 的成立年份资料中未提供。
+- 即使需要“大学”建校年份，这里也没有大学。
+- 因此：**未找到。**
+
+**结论：**
+- 通讯作者所属大学：**资料中未明确通讯作者；若按 `∗` 推测，所属机构为 Microsoft，不是大学。**
+- 建校年份：**资料中未找到。**
+
+---
+
+## 4. 片段1对应的论文
+
+**资料中有依据的信息：**
+- 片段1只有致谢内容：
+  - OK was supported by the Eltoukhy Family Graduate Fellowship at the Stanford School of Engineering.
+  - This research was supported in part by affiliate members and other supporters of the Stanford DAWN project...
+  - NSF under CAREER grant CNS-1651570.
+- 提到 Stanford School of Engineering、Stanford DAWN project。
+- 但没有给出论文标题、作者列表、通讯作者、作者单位标注。
+
+**可推断的信息：**
+- 该研究可能与 Stanford University 有关。
+- 但无法确认通讯作者是谁，也无法确认通讯作者所属大学就是 Stanford。
+- 更不能确认“四篇论文”中这一篇的通讯作者信息。
+
+**建校年份：**
+- 资料中未提供 Stanford University 的建校年份。
+- 因此：**未找到。**
+
+**结论：**
+- 通讯作者所属大学：**资料不足，无法判断。**
+- 建校年份：**资料中未找到。**
+
+---
+
+## 汇总表
+
+| 论文 | 资料中可确认的通讯作者/标注 | 通讯作者所属大学 | 建校年份 |
+|---|---|---|---|
+| RocketQA | 片段5中 Jing Liu∗、Wayne Xin Zhao∗；Wayne Xin Zhao 属中国人民大学 | 若按 Wayne Xin Zhao 判断：中国人民大学；但“通讯作者”为推测 | 未找到 |
+| Dense Passage Retrieval for Open-Domain Question Answering | Vladimir Karpukhin∗、Barlas Oğuz∗；另有 University of Washington、Princeton University | 无法可靠判断通讯作者；`∗` 不一定等于通讯作者 | 未找到 |
+| APPROXIMATE NEAREST NEIGHBOR NEGATIVE CONTRASTIVE LEARNING FOR DENSE TEXT RETRIEVAL | Lee Xiong∗、Chenyan Xiong∗；单位 Microsoft | 若按 `∗` 推测为 Microsoft，不是大学 | 未找到 |
+| 片段1对应论文 | 仅提到 Stanford School of Engineering、Stanford DAWN project | 无法判断通讯作者；可能与 Stanford 有关，但不能确认 | 未找到 |
+
+---
+
+## 最终回答
+
+在现有资料中：
+
+1. **RocketQA**  
+   - 若将 Wayne Xin Zhao 视为通讯作者，其所属大学是 **中国人民大学**。  
+   - 但资料未明确写“通讯作者”，这是根据 `∗` 标注作出的推测。  
+   - 中国人民大学的建校年份：**资料中未找到。**
+
+2. **Dense Passage Retrieval for Open-Domain Question Answering**  
+   - 资料中未明确通讯作者。  
+   - 涉及大学有 **University of Washington** 和 **Princeton University**，但不能确认哪一位是通讯作者。  
+   - 两所大学的建校年份：**资料中未找到。**
+
+3. **APPROXIMATE NEAREST NEIGHBOR NEGATIVE CONTRASTIVE LEARNING FOR DENSE TEXT RETRIEVAL**  
+   - 资料中未明确通讯作者。  
+   - 若按 `∗` 推测，相关作者属于 **Microsoft**，不是大学。  
+   - 建校年份：**资料中未找到。**
+
+4. **片段1对应论文**  
+   - 资料中没有论文标题、作者和通讯作者信息。  
+   - 仅提到 Stanford School of Engineering 和 Stanford DAWN project，可能与 **Stanford University** 有关，但不能确认通讯作者所属大学。  
+   - 建校年份：**资料中未找到。**
+
+因此，严格依据现有资料，**无法完整回答四篇论文各自通讯作者所属大学及建校年份**；唯一较有依据的是 RocketQA 中 Wayne Xin Zhao 所属的中国人民大学，但“通讯作者”身份仍需谨慎视为推测。

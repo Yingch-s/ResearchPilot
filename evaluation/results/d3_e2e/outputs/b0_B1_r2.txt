@@ -1,0 +1,167 @@
+# B1 · b0 · round 2
+
+对比 DPR、ColBERT、ANCE、RocketQA 的训练配置全貌：训练数据、负样本策略、蒸馏/数据增强。
+
+---
+
+下面按 **DPR、ColBERT、ANCE、RocketQA** 四者对比其训练配置全貌，重点放在**训练数据、负样本策略、蒸馏/数据增强**。我会尽量区分“论文明确给出的”与“后续实现/复现中常见但论文未强调的”，不确定处会标注。
+
+---
+
+## 1. DPR（Dense Passage Retriever，2020）
+
+**代表论文**：Karpukhin et al., 2020, *Dense Passage Retrieval for Open-Domain Question Answering*
+
+### 训练数据
+- 主要使用 **Natural Questions（NQ）**、**TriviaQA**、**WebQuestions**、**CuratedTREC** 等开放域 QA 数据集。
+- 训练双塔：问题编码器 + 段落编码器。
+- 正样本：来自 QA 数据集中标注的 answer passage，或包含答案的段落。
+- 对多数据集训练时，通常把各数据集的训练样本混合。
+
+### 负样本策略
+DPR 的核心贡献之一就是系统比较了负采样：
+- **Random negatives**：从语料中随机抽取段落。
+- **BM25 negatives**：用 BM25 检索出的高分但非正样本段落。
+- **Gold / positive passages**：正样本。
+- 最终常用配置：
+  - 每个问题配 **1 个正样本 + n 个负样本**；
+  - 负样本中通常包含 **BM25 难负例 + 随机负例**；
+  - 论文中较好配置为：**1 positive + 1 BM25 negative + n random negatives**，或类似混合。
+- 使用 **in-batch negatives**：同一 batch 内其他问题的正样本可作为当前问题的负样本，提高效率。
+- 损失函数：NLL / cross-entropy over positive vs. negatives，或对比学习式 softmax。
+
+### 蒸馏 / 数据增强
+- DPR 本身**不以知识蒸馏为核心**。
+- 数据增强方面：
+  - 使用多数据集联合训练；
+  - 对训练问题/段落做常规预处理；
+  - 没有像 RocketQA 那样系统使用 cross-encoder 蒸馏或 denoised hard negatives。
+- 后续工作常把 DPR 作为学生模型或基线，但原始 DPR 论文中蒸馏不是重点。
+
+### 小结
+DPR 奠定了“双塔 + 对比学习 + BM25 难负例 + in-batch negatives”的范式，但负样本策略相对直接，训练数据以标注 QA 对为主。
+
+---
+
+## 2. ColBERT（2020，及 ColBERTv2）
+
+**代表论文**：
+- Khattab & Zaharia, 2020, *ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT*
+- Santhanam et al., 2022, *ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction*
+
+### 训练数据
+- ColBERT 原始训练常使用 **MS MARCO Passage Ranking**。
+- 也使用 **TREC CAR**、**Natural Questions** 等。
+- 训练三元组：`(query, positive passage, negative passage)`。
+- ColBERTv2 继续以 MS MARCO 为主，并强调大规模训练与蒸馏。
+
+### 负样本策略
+- 原始 ColBERT：
+  - 使用 **triple training**：每个 query 配一个正例和一个负例。
+  - 负例可来自：
+    - 随机负例；
+    - BM25 难负例；
+    - 其他检索器挖掘的负例。
+  - 训练目标：正例得分高于负例，常用 pairwise softmax / margin loss。
+- ColBERTv2：
+  - 更强调 **hard negatives** 和 **denoised supervision**。
+  - 使用 **cross-encoder 或更强检索器挖掘难负例**。
+  - 通过 **knowledge distillation** 从更强模型（如 cross-encoder）学习。
+  - 引入 **denoised training**：过滤噪声负例，提升训练稳定性。
+
+### 蒸馏 / 数据增强
+- ColBERTv2 明确使用 **蒸馏**：
+  - 从 cross-encoder reranker 或更强 teacher 中蒸馏分数/排序信号。
+  - 学生模型为 ColBERT 的 late interaction 结构。
+- 数据增强：
+  - 使用大规模伪标签数据；
+  - 对 MS MARCO 等数据做难负例挖掘；
+  - 可能使用 query 生成、段落扩展等，但论文重点在蒸馏与去噪。
+
+### 小结
+ColBERT 早期是三元组训练 + 难负例；ColBERTv2 明显转向 **蒸馏 + 去噪难负例 + 大规模训练**，与 RocketQA 的思路有相似之处，但模型结构是 late interaction。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning，2020/2021）
+
+**代表论文**：Xiong et al., 2020/2021, *Approximate Nearest Neighbor Negative Contrastive Learning for Dense Text Retrieval*
+
+### 训练数据
+- 主要使用 **MS MARCO Passage Ranking**。
+- 也常用于 NQ、TriviaQA 等开放域 QA 检索训练。
+- 训练样本：query + positive passage + negatives。
+
+### 负样本策略
+ANCE 的核心是 **动态难负例挖掘**：
+- 传统方法用 BM25 或静态负例。
+- ANCE 认为：随着模型更新，负例分布应随之更新。
+- 做法：
+  - 使用当前模型对全语料做 **ANN 检索**；
+  - 从检索结果中选取非正例作为 **hard negatives**；
+  - 这些负例是“模型当前认为相似但实际不正确”的段落；
+  - 定期刷新负例索引，使负例与模型同步进化。
+- 这被称为 **approximate nearest neighbor negative contrastive learning**。
+- 训练目标：对比学习，正例得分高于 ANN 难负例。
+
+### 蒸馏 / 数据增强
+- ANCE 本身**不以蒸馏为核心**。
+- 数据增强：
+  - 主要靠动态负例挖掘；
+  - 没有系统使用 cross-encoder 蒸馏。
+- 后续一些工作会把 ANCE 与蒸馏结合，但原始 ANCE 重点是负例刷新机制。
+
+### 小结
+ANCE 的最大特点是 **用当前模型的 ANN 检索结果作为动态难负例**，解决静态负例与模型进化不匹配的问题。训练数据通常为 MS MARCO，蒸馏不是重点。
+
+---
+
+## 4. RocketQA（2021）
+
+**代表论文**：Qu et al., 2021, *RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering*
+
+### 训练数据
+- 使用 **MS MARCO**、**Natural Questions**、**TriviaQA** 等。
+- 强调大规模、高质量训练数据。
+- 使用 **cross-batch negatives**、**denoised hard negatives**、**data augmentation** 等技术。
+
+### 负样本策略
+RocketQA 的核心贡献包括：
+1. **Cross-batch negatives**：
+   - 传统 in-batch negatives 只在同一 batch 内取负例。
+   - RocketQA 跨 batch 共享负例，扩大负例池，提高训练效率。
+2. **Denoised hard negatives**：
+   - 用强 cross-encoder 或 teacher 对难负例打分；
+   - 过滤掉“假阴性”（实际相关但被当作负例）的样本；
+   - 减少噪声对双塔训练的伤害。
+3. **Hard negative mining**：
+   - 从 BM25、ANN 或 teacher 模型中挖掘难负例；
+   - 再经去噪后用于训练。
+
+### 蒸馏 / 数据增强
+RocketQA 明确使用 **蒸馏与数据增强**：
+- **Cross-encoder 蒸馏**：
+  - 先用 cross-encoder 对 query-passage 对打分；
+  - 再用这些软标签训练双塔 retriever；
+  - 提升双塔效果。
+- **数据增强**：
+  - 使用 **伪标签数据**：用强模型标注未标注 query-passage 对；
+  - 使用 **数据增强** 生成更多训练样本；
+  - 结合去噪难负例，形成高质量训练集。
+- 整体流程常被描述为：
+  1. 训练 cross-encoder；
+  2. 挖掘难负例；
+  3. 去噪；
+  4. 蒸馏到双塔；
+  5. 迭代优化。
+
+### 小结
+RocketQA 是四者中**最系统使用蒸馏 + 去噪难负例 + 数据增强**的方法。它把 cross-encoder 的知识蒸馏到双塔，并通过去噪和跨 batch 负例提升训练质量。
+
+---
+
+## 5. 四者对比总表
+
+| 维度 | DPR | ColBERT / ColBERTv2 | ANCE | RocketQA |
+|---|---|---|---|---|
+| 代表训练数据 | NQ、TriviaQA、WebQ、CuratedTREC | MS MARCO、TREC CAR、NQ；v2 以 MS MARCO 为主 | MS MARCO、NQ、

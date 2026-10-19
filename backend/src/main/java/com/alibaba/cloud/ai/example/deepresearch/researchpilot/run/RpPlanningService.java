@@ -155,8 +155,10 @@ public class RpPlanningService {
 
 						注意：has_enough_context 必须为 false（需要实际取证）。
 						""");
+		// P0-B：429/503 先退避重试（预算内，重试耗尽才按无规划处理）
 		ChatResponse response = callWithTimeout(
-				() -> plannerAgent.prompt().user(prompt.toString()).call().chatResponse());
+				() -> com.alibaba.cloud.ai.example.deepresearch.researchpilot.llm.LlmBackoff
+					.call(() -> plannerAgent.prompt().user(prompt.toString()).call().chatResponse(), 3, 2000));
 		String raw = response == null || response.getResult() == null || response.getResult().getOutput() == null ? ""
 				: response.getResult().getOutput().getText();
 		if (raw == null) {

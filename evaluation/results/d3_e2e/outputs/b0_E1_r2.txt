@@ -1,0 +1,20 @@
+# E1 · b0 · round 2
+
+RocketQA 的去噪（denoising）策略在论文的哪一部分？具体做了什么？
+
+---
+
+RocketQA 的去噪（denoising）策略主要出现在论文 **《RocketQA: An Optimized Training Approach for Dense Passage Retrieval》** 中，核心在 **第 3 节“Optimized Training Approach”**，更具体地说是在 **3.1 节“Cross-batch Negative Sampling”之后/相邻的“Denoising”部分**（不同版本排版可能略有差异，但通常归在训练方法章节中）。  
+
+它要解决的问题是：在密集检索训练中，负样本（尤其是 batch 内负样本或 cross-batch 负样本）可能并不是真正的“负”样本，而可能是与 query 相关的正样本，只是没有出现在标注数据里。这种“假阴性”会给训练带来噪声。
+
+具体做法大致是：
+
+1. **用 RocketQA 第一阶段训练好的 retriever 对训练集中的 query 做检索**，得到一批候选 passage。
+2. **用 cross-encoder 或更强的 reranker 对候选 passage 进行相关性打分/过滤**，把那些虽然未被标注为正例、但实际与 query 高度相关的 passage 识别出来。
+3. **将这些被识别为“潜在正例”的 passage 从负样本中去除**，避免它们继续作为负样本参与训练。
+4. 用去噪后的数据重新训练 retriever，从而减少假阴性带来的负面影响。
+
+需要注意：  
+- 我上面描述的是 RocketQA 论文中 denoising 的核心思想与流程，但**具体实现细节（例如用哪个模型打分、阈值如何设定、去噪在哪个训练阶段执行）我无法逐字确认**，不同论文版本或后续复现可能略有差异。  
+- 如果你需要精确到“第几页、第几段、公式编号”，建议直接查看论文 PDF 的 **Section 3.1 或 Section 3.2**，并核对原文。

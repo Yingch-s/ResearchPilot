@@ -24,25 +24,27 @@ import java.util.Set;
  *
  * <pre>
  * CREATED → PLANNING → WAITING_APPROVAL → RESEARCHING → VERIFYING → FINALIZING
- *                                            │                        ├── COMPLETED
- *                                            │                        ├── PARTIAL_COMPLETED
- *                                            │                        └── FAILED
+ *            │              │                 │                     ├── COMPLETED
+ *            │              │                 │                     ├── PARTIAL_COMPLETED
+ *            │              │                 │                     └── FAILED
+ *            └──────────────┴────→ QUEUED ───┘（P0-B：满载排队，sweeper 补位）
  *                                            └──→ CANCELLED（允许取消的阶段）
  * </pre> 合法转移集中在单点（{@link #canTransitionTo}），执行由 RpRunService 乐观并发控制 （UPDATE ... WHERE
  * status = from），无双调度系统。
  */
 public enum RunStatus {
 
-	CREATED, PLANNING, WAITING_APPROVAL, RESEARCHING, VERIFYING, FINALIZING, COMPLETED, PARTIAL_COMPLETED, FAILED,
-	CANCELLED;
+	CREATED, PLANNING, WAITING_APPROVAL, RESEARCHING, QUEUED, VERIFYING, FINALIZING, COMPLETED, PARTIAL_COMPLETED,
+	FAILED, CANCELLED;
 
 	/**
-	 * 合法转移表（唯一权威定义）。
+	 * 合法转移表（唯一权威定义）。P0-B：PLANNING/WAITING_APPROVAL 满载时可入队（QUEUED），sweeper 补位提升。
 	 */
 	public static final Map<RunStatus, Set<RunStatus>> ALLOWED = Map.of(CREATED, Set.of(PLANNING, CANCELLED), PLANNING,
-			Set.of(WAITING_APPROVAL, RESEARCHING, CANCELLED, FAILED), WAITING_APPROVAL, Set.of(RESEARCHING, CANCELLED),
-			RESEARCHING, Set.of(VERIFYING, FINALIZING, CANCELLED, FAILED), VERIFYING, Set.of(FINALIZING, FAILED),
-			FINALIZING, Set.of(COMPLETED, PARTIAL_COMPLETED, FAILED));
+			Set.of(WAITING_APPROVAL, RESEARCHING, QUEUED, CANCELLED, FAILED), WAITING_APPROVAL,
+			Set.of(RESEARCHING, QUEUED, CANCELLED), QUEUED, Set.of(RESEARCHING, CANCELLED), RESEARCHING,
+			Set.of(VERIFYING, FINALIZING, CANCELLED, FAILED), VERIFYING, Set.of(FINALIZING, FAILED), FINALIZING,
+			Set.of(COMPLETED, PARTIAL_COMPLETED, FAILED));
 
 	public boolean canTransitionTo(RunStatus target) {
 		return ALLOWED.getOrDefault(this, Set.of()).contains(target);

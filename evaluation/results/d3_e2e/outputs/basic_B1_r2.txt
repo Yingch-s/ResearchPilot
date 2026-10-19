@@ -1,0 +1,143 @@
+# B1 · basic · round 2
+
+对比 DPR、ColBERT、ANCE、RocketQA 的训练配置全貌：训练数据、负样本策略、蒸馏/数据增强。
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 训练配置对比
+
+## 重要说明
+
+本次检索到的资料片段**仅覆盖 RocketQA 和 ANCE 的部分训练配置**，以及 DPR 的少量间接信息。**ColBERT 的训练配置在提供的资料中完全没有出现**。因此，以下回答将严格区分：
+
+- ✅ **资料中有依据的结论**
+- ⚠️ **基于资料的合理推测**
+- ❌ **资料中未找到的信息**
+
+---
+
+## 一、逐篇论文说明
+
+### 1. DPR（Karpukhin et al., 2020）
+
+**资料中有依据的结论：**
+
+- ✅ **预训练模型**：DPR 使用 BERT-base（片段4明确记载："DPR (Karpukhin et al., 2020) uses BERTbase"）。
+- ✅ **负样本策略（间接）**：片段1提到 "BM25 negatives can help train dense retrieval (Karpukhin et al., 2020; Luan et al., 2020)"，说明 DPR 的工作中涉及 BM25 负样本的使用。
+- ✅ **被 ANCE 用作热启动**：片段1提到 "In OpenQA, we warm up ANCE using the released DPR checkpoints"，说明 DPR 发布了可供后续工作使用的 checkpoint。
+
+**资料中未找到的信息：**
+
+- ❌ DPR 的具体训练数据集（如 NQ、TriviaQA、WebQuestions 等的具体使用方式）
+- ❌ DPR 的 in-batch negatives 具体配置
+- ❌ DPR 是否使用蒸馏或数据增强
+- ❌ DPR 的 batch size、学习率等超参数
+
+---
+
+### 2. ColBERT
+
+**资料中未找到的信息：**
+
+- ❌ 提供的 5 个片段中**完全没有出现 ColBERT**。
+- ❌ 无法说明其训练数据、负样本策略、蒸馏/数据增强配置。
+
+**推测（⚠️ 仅基于常识，非资料依据）：**
+ColBERT 通常被认为使用 in-batch negatives 和 MS MARCO 训练数据，但**这在本资料中没有任何依据**，不应作为结论。
+
+---
+
+### 3. ANCE（Xiong et al., 2020）
+
+**资料中有依据的结论：**
+
+- ✅ **预训练模型**：ANCE 使用 RoBERTa-base（片段4："ANCE (Xiong et al., 2020) uses RoBERTabase"）。
+- ✅ **负样本策略**：ANCE 通过 BM25 negatives 进行 warm up（片段1："ANCE is also warmed up by BM25 negatives"）。
+- ✅ **在 OpenQA 中的热启动**：ANCE 在 OpenQA 任务中使用 DPR 发布的 checkpoint 进行 warm up（片段1："In OpenQA, we warm up ANCE using the released DPR checkpoints"）。
+- ✅ **ANCE 的核心思想（间接）**：ANCE 的名称暗示其使用"近似最近邻负样本"（Approximate Nearest Neighbor Negative Contrastive Estimation），但资料中未直接展开其负样本更新机制。
+
+**资料中未找到的信息：**
+
+- ❌ ANCE 的具体训练数据集
+- ❌ ANCE 的负样本刷新频率、候选池大小等细节
+- ❌ ANCE 是否使用蒸馏或数据增强
+- ❌ ANCE 的 batch size、学习率等超参数
+
+---
+
+### 4. RocketQA（Qu et al., 2021）
+
+**资料中有依据的结论：**
+
+RocketQA 的训练配置在资料中记载最为详细，其三大核心策略为：
+
+- ✅ **策略一：Cross-batch negatives（跨批次负样本）**
+  - 相比 in-batch negatives，增加了每个问题在训练时可用的负样本数量（片段2）。
+  - 缓解了训练与推理之间的差异（片段2）。
+
+- ✅ **策略二：Denoised hard negatives（去噪硬负样本）**
+  - 从 retriever 检索到的 top-ranked 结果中移除 false negatives，从而获得更可靠的硬负样本（片段2）。
+
+- ✅ **策略三：Data augmentation（数据增强）**
+  - 利用 cross-encoder 对大规模无监督数据进行"标注"，生成高质量伪标签，用于训练 dual-encoder retriever（片段2）。
+  - 理论依据：cross-encoder 在理论和实践中都比 dual-encoder 更强，但效率低，因此用其生成伪标签（片段2）。
+
+- ✅ **预训练模型**：RocketQA 主要使用 ERNIE-base；实验中也尝试用 BERT-base 替换，性能略降（片段4）。
+  - ERNIE-base 相比 BERT-base 在 MS MARCO 上 MRR@10 提升约 0.6，在 NQ 上 R@100 提升约 1.6（片段4）。
+
+- ✅ **训练数据（间接）**：片段1提到 TREC DL 中使用 MARCO passage 训练标签，且 "MARCO passage training labels cleaner"（Yan et al., 2019）。RocketQA 的数据增强使用了大规模无监督数据（片段2），但具体数据集名称未在资料中列出。
+
+- ✅ **BM25 Warm Up**：片段1提到 "BM25 Warm Up" 设置（BM25 → ∗），DR 模型首先使用 MARCO 官方 BM25 Negatives 训练。RocketQA 是否采用此设置，资料中未明确说明，但该设置是 TREC DL 中 DR 模型的通用做法。
+
+**资料中未找到的信息：**
+
+- ❌ RocketQA 的具体训练数据集名称（如 NQ、MS MARCO 的具体版本）
+- ❌ Cross-batch negatives 的具体 batch size 和跨批次数量
+- ❌ Denoised hard negatives 的去噪阈值或具体方法
+- ❌ Data augmentation 中无监督数据的具体来源和规模
+- ❌ 蒸馏的具体配置（虽然使用了 cross-encoder 生成伪标签，但这是数据增强而非传统蒸馏）
+
+---
+
+## 二、对比总结表
+
+| 维度 | DPR | ColBERT | ANCE | RocketQA |
+|------|-----|---------|------|----------|
+| **预训练模型** | BERT-base ✅ | ❌ 未找到 | RoBERTa-base ✅ | ERNIE-base（主）；BERT-base（对比）✅ |
+| **训练数据** | ❌ 未找到具体数据集 | ❌ 未找到 | ❌ 未找到具体数据集 | 大规模无监督数据（数据增强）✅；具体名称❌ |
+| **负样本策略** | BM25 negatives（间接）✅ | ❌ 未找到 | BM25 warm up ✅；DPR checkpoint warm up（OpenQA）✅ | Cross-batch negatives ✅；Denoised hard negatives ✅ |
+| **蒸馏/数据增强** | ❌ 未找到 | ❌ 未找到 | ❌ 未找到 | Cross-encoder 生成伪标签进行数据增强 ✅ |
+| **Warm Up** | ❌ 未找到 | ❌ 未找到 | BM25 negatives；DPR checkpoint ✅ | BM25 Warm Up（TREC DL 通用设置，RocketQA 是否采用未明确）⚠️ |
+
+---
+
+## 三、关键差异与联系（基于资料）
+
+1. **负样本策略的演进**：
+   - DPR 和 ANCE 都涉及 BM25 negatives（片段1）。
+   - ANCE 进一步使用 DPR checkpoint 进行 warm up（片段1）。
+   - RocketQA 提出 cross-batch negatives 和 denoised hard negatives，是对 in-batch negatives 和普通 hard negatives 的改进（片段2、3）。
+
+2. **数据增强**：
+   - 只有 RocketQA 明确使用 cross-encoder 生成伪标签进行数据增强（片段2）。
+   - DPR、ANCE、ColBERT 是否使用数据增强，资料中未找到。
+
+3. **预训练模型选择**：
+   - DPR 用 BERT-base，ANCE 用 RoBERTa-base，RocketQA 用 ERNIE-base（片段4）。
+   - ColBERT 的预训练模型未找到。
+
+4. **蒸馏**：
+   - 资料中**没有任何一篇论文明确提到"蒸馏"（knowledge distillation）**。
+   - RocketQA 的 cross-encoder 生成伪标签可视为一种"数据增强"而非传统蒸馏（片段2）。
+
+---
+
+## 四、资料局限性声明
+
+本次回答基于 5 个资料片段，其中：
+- **RocketQA** 的信息最丰富（片段2、3、4、5）。
+- **ANCE** 有部分信息（片段1、4）。
+- **DPR** 仅有间接信息（片段1、4）。
+- **ColBERT** 完全没有信息。
+
+因此，**无法完整对比四篇论文的训练配置全貌**。若需完整对比，建议补充检索 ColBERT 原文、DPR 原文、ANCE 原文以及 RocketQA 原文的实验设置章节。

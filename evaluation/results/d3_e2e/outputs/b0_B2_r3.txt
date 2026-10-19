@@ -1,0 +1,109 @@
+# B2 · b0 · round 3
+
+DPR、ColBERT、ANCE、RocketQA 各自报告了怎样的资源需求（算力、索引体积的定性描述）？
+
+---
+
+下面按“训练/推理算力”和“索引体积/检索开销”两个维度，对 DPR、ColBERT、ANCE、RocketQA 的**资源需求定性描述**做梳理。需要先说明：这些系统在不同论文、不同复现实验、不同骨干模型和语料规模下差异很大；以下主要依据各自代表性论文/官方实现中常见的设定，属于**定性总结**，不是统一基准下的精确对比。若某一点我没有足够把握，会明确标注。
+
+---
+
+## 1. DPR（Dense Passage Retriever）
+
+**代表工作**：Karpukhin et al., 2020, *Dense Passage Retrieval for Open-Domain Question Answering*。
+
+### 算力需求
+- **训练**：DPR 使用双塔（dual encoder）结构，query encoder 和 passage encoder 通常基于 BERT-base。训练时需要大批量负采样（in-batch negatives + hard negatives），对 GPU 显存和吞吐有一定要求。
+- 论文中常见配置是 **8×GPU** 级别进行训练；相比 ColBERT 的 late interaction，DPR 的交互发生在向量内积层面，训练图相对简单，但因为要编码大量 passage，整体训练仍不轻。
+- **推理/检索**：query 侧编码很轻；passage 侧需要预先编码整个语料库。检索时是最大内积搜索（MIPS），可用 FAISS 等近似最近邻库加速。
+
+### 索引体积
+- 每个 passage 压缩为**单个稠密向量**，典型维度为 768。
+- 因此索引体积大致为：`passage 数 × 768 × 浮点精度`。若用 float32，约每 passage 3 KB；若用 float16 或 PQ 量化，可显著降低。
+- 相比 ColBERT 的多向量索引，DPR 索引**较小**，属于“单向量/段落”方案。
+- 但若语料是 Wikipedia 级别（数千万 passage），原始 float32 索引仍会达到数十 GB 量级；实际系统常配合 FAISS IVF/PQ 压缩。
+
+**定性结论**：训练算力中等偏上，检索索引较小，适合大规模 ANN 检索。
+
+---
+
+## 2. ColBERT
+
+**代表工作**：Khattab & Zaharia, 2020, *ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT*；后续 ColBERTv2 进一步优化。
+
+### 算力需求
+- **训练**：ColBERT 使用 late interaction，query 和 document 都保留 token 级向量。训练时需要对 query token 与 document token 做 MaxSim 交互，计算图比 DPR 更复杂。
+- 原始 ColBERT 训练成本较高，通常也需要多 GPU；ColBERTv2 通过去噪监督、残差压缩等降低了部分成本，但整体仍比单向量双塔更重。
+- **推理/检索**：query 编码后，需要对候选 document 的 token 向量做 MaxSim。若直接暴力扫描全库，成本很高；因此 ColBERT 通常采用两阶段：先用 ANN 召回候选，再做 late interaction 重排。
+- 检索延迟通常高于 DPR，因为每个 document 有多个 token 向量，打分计算更重。
+
+### 索引体积
+- 每个 document 不再是一个向量，而是**每个 token 一个向量**。典型维度 128（ColBERT 常用降维到 128）。
+- 索引体积大致为：`总 token 数 × 128 × 精度`。由于文档 token 数远大于文档数，索引体积通常**显著大于 DPR**。
+- 原始 ColBERT 索引可能达到 DPR 的数十倍量级；ColBERTv2 引入残差压缩和 centroid 机制，大幅降低索引体积，但仍属于多向量索引，通常比单向量 DPR 大。
+- 官方实现中常提到 ColBERT 索引可达几十 GB 到上百 GB，取决于语料和压缩设置。
+
+**定性结论**：训练和检索算力较高，索引体积大；ColBERTv2 缓解了索引膨胀，但总体仍比单向量方案重。
+
+---
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Estimation）
+
+**代表工作**：Xiong et al., 2021, *Approximate Nearest Neighbor Negative Contrastive Learning for Dense Text Retrieval*。
+
+### 算力需求
+- **训练**：ANCE 的核心是用 ANN 索引动态刷新负样本，而不是只用静态 in-batch negatives。训练过程中需要周期性重新编码/更新 passage 向量并重建或更新 ANN 索引。
+- 因此训练算力**高于普通 DPR 式训练**：除了双塔前向/反向，还要维护 ANN 索引、异步刷新负样本。
+- 论文中通常也使用多 GPU，并强调异步索引刷新以控制成本。
+- **推理/检索**：与 DPR 类似，query 编码 + ANN 检索，检索阶段开销与 DPR 接近。
+
+### 索引体积
+- ANCE 本身仍是**单向量双塔**方案，passage 表示为单个稠密向量。
+- 索引体积与 DPR 同量级：`passage 数 × 维度 × 精度`。
+- 若使用 FAISS ANN，索引可进一步压缩。
+- 因此索引体积通常**小于 ColBERT**，与 DPR 接近。
+
+**定性结论**：训练算力高于 DPR（因动态 ANN 负采样），索引体积与 DPR 同量级，检索开销接近 DPR。
+
+---
+
+## 4. RocketQA
+
+**代表工作**：Qu et al., 2021, *RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering*。
+
+### 算力需求
+- **训练**：RocketQA 针对 DPR 训练中的若干问题提出优化，包括跨批次负采样、去噪强负样本、数据增强等。它通常使用更大的 batch size 和更复杂的负采样策略。
+- 论文中常见配置为 **8×GPU 或更多**，训练成本较高；相比 DPR，RocketQA 的训练流程更重，但仍是双塔稠密检索框架。
+- **推理/检索**：与 DPR/ANCE 类似，query 编码 + 单向量 ANN 检索，检索阶段开销与 DPR 同量级。
+- RocketQA 还常与 reranker 配合，若算整个 pipeline，reranker 会额外增加算力。
+
+### 索引体积
+- RocketQA 的 retriever 仍是**单向量双塔**，passage 表示为单个稠密向量。
+- 索引体积与 DPR/ANCE 同量级：`passage 数 × 维度 × 精度`。
+- 通常也使用 FAISS 等 ANN 索引，可量化压缩。
+- 因此索引体积**远小于 ColBERT**，与 DPR/ANCE 接近。
+
+**定性结论**：训练算力较高（大 batch、复杂负采样），索引体积与 DPR/ANCE 同量级，检索开销接近单向量稠密检索。
+
+---
+
+## 横向对比简表
+
+| 系统 | 训练算力定性 | 检索/推理算力定性 | 索引体积定性 |
+|---|---|---|---|
+| DPR | 中等偏上，多 GPU，双塔+负采样 | 轻，query 编码+ANN | 小，单向量/passage |
+| ColBERT | 高，late interaction 训练复杂 | 较高，多向量 MaxSim，常需两阶段 | 大，token 级多向量；v2 压缩后仍偏大 |
+| ANCE | 高于 DPR，需动态 ANN 负采样 | 轻，接近 DPR | 小，与 DPR 同量级 |
+| RocketQA | 高，大 batch+复杂负采样 | 轻，接近 DPR；若含 reranker 则更重 | 小，与 DPR/ANCE 同量级 |
+
+---
+
+## 需要说明的不确定性
+
+1. **具体 GPU 数量、训练时长、索引 GB 数**：不同论文、不同语料（如 Wikipedia vs MS MARCO）、不同骨干模型（BERT-base vs large）差异很大，上述未给出精确数字，以免误导。
+2. **ColBERTv2 的索引压缩效果**：ColBERTv2 显著降低了索引体积，但具体压缩比取决于残差压缩维度和 centroid 数量；我没有把握给出统一倍数。
+3. **RocketQA 的训练细节**：RocketQA 有多个版本和后续工作，不同版本的训练配置不同；上述描述基于其代表性论文的常见设定。
+4. **ANCE 的索引刷新频率**：这直接影响训练总算力，论文中通常采用异步刷新以平衡效果和成本，具体开销取决于实现。
+5. **是否包含 reranker**：RocketQA 等系统常与 cross-encoder reranker 一起使用，若算整个 pipeline，算力需求会明显增加；上表主要针对 retriever 部分。
+
+如果你需要，我可以进一步按“训练阶段 / 索引构建阶段 / 在线检索阶段”拆成更细的资源需求对比。

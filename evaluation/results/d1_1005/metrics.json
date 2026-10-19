@@ -1,0 +1,98 @@
+{
+  "protocol": "PROTOCOL.md v1.0 §1",
+  "topk": 10,
+  "corpus_docs": 64183,
+  "results": {
+    "bm25": {
+      "recall@5": 0.5997,
+      "recall@10": 0.6616,
+      "mrr@10": 0.4906,
+      "queries": 597,
+      "errors": 0,
+      "elapsed_s": 105.3
+    },
+    "dense": {
+      "recall@5": 0.6817,
+      "recall@10": 0.7387,
+      "mrr@10": 0.5482,
+      "queries": 597,
+      "errors": 0,
+      "elapsed_s": 54.7
+    },
+    "hybrid": {
+      "recall@5": 0.6951,
+      "recall@10": 0.7638,
+      "mrr@10": 0.5821,
+      "queries": 597,
+      "errors": 0,
+      "elapsed_s": 133.8
+    }
+  },
+  "ndcg_at_10": {
+    "bm25": 0.5249,
+    "dense": 0.5863,
+    "hybrid": 0.6189
+  },
+  "precision_at_5": {
+    "bm25": 0.1219,
+    "dense": 0.1394,
+    "hybrid": 0.1424
+  },
+  "ndcg10_by_set": {
+    "bm25": {
+      "inline_acl": {
+        "ndcg10": 0.4841,
+        "p5": 0.1224
+      },
+      "inline_nonacl": {
+        "ndcg10": 0.4501,
+        "p5": 0.1067
+      },
+      "manual_acl": {
+        "ndcg10": 0.5966,
+        "p5": 0.1303
+      },
+      "manual_iclr": {
+        "ndcg10": 0.6547,
+        "p5": 0.1495
+      }
+    },
+    "dense": {
+      "inline_acl": {
+        "ndcg10": 0.5299,
+        "p5": 0.1367
+      },
+      "inline_nonacl": {
+        "ndcg10": 0.5822,
+        "p5": 0.1375
+      },
+      "manual_acl": {
+        "ndcg10": 0.5962,
+        "p5": 0.1394
+      },
+      "manual_iclr": {
+        "ndcg10": 0.6419,
+        "p5": 0.1473
+      }
+    },
+    "hybrid": {
+      "inline_acl": {
+        "ndcg10": 0.5591,
+        "p5": 0.1388
+      },
+      "inline_nonacl": {
+        "ndcg10": 0.5768,
+        "p5": 0.1375
+      },
+      "manual_acl": {
+        "ndcg10": 0.6577,
+        "p5": 0.1432
+      },
+      "manual_iclr": {
+        "ndcg10": 0.7344,
+        "p5": 0.1582
+      }
+    }
+  },
+  "ndcg_note": "二值相关性下 nDCG@10 退化偏 MRR（无分级相关），如实标注"
+}

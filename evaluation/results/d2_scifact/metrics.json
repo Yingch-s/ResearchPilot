@@ -1,0 +1,16 @@
+{
+  "valid": 1108,
+  "confusion": {
+    "NOT_ENOUGH_INFO->CONTRADICTED": 239,
+    "NOT_ENOUGH_INFO->INSUFFICIENT": 388,
+    "NOT_ENOUGH_INFO->SUPPORTED": 26,
+    "SUPPORT->CONTRADICTED": 15,
+    "SUPPORT->INSUFFICIENT": 66,
+    "SUPPORT->SUPPORTED": 374
+  },
+  "false_support_rate_nei": 0.0046,
+  "honest_abstain_rate_nei": 0.5942,
+  "support_accuracy": 0.822,
+  "best_relatedness_threshold": 0.6,
+  "best_threshold_accuracy": 0.6297
+}

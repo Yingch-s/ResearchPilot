@@ -1,0 +1,71 @@
+# D1 · b0 · round 3
+
+DPR、ColBERT、ANCE、RocketQA 各论文分别使用什么缓存/消息队列框架部署在线服务？
+
+---
+
+结论先说：**这四篇论文的正文都没有把“缓存/消息队列框架”作为在线服务部署的核心工程细节来报告。** 因此，如果问题是“它们分别用了什么缓存/消息队列框架”，严格按论文内容回答，答案是：**基本没有明确给出；不能可靠地归因到 Redis、Kafka、RabbitMQ、Memcached 等具体框架。**
+
+下面按对象分别说明。
+
+## 1. DPR（Dense Passage Retrieval, EMNLP 2020）
+
+- **论文是否报告缓存/消息队列框架？**
+  - 没有。DPR 论文主要报告的是双塔编码器、训练目标、负采样、FAISS 索引、top-k 检索等。
+  - 在线服务部分通常描述为：用 FAISS 做向量检索，文档向量离线预计算并建索引，查询时编码问题后检索。
+- **是否使用缓存/消息队列？**
+  - 论文没有明确说使用 Redis、Memcached、Kafka、RabbitMQ 等。
+  - 可以确定的是它依赖 **FAISS** 作为向量索引/检索库，但 FAISS 不是缓存或消息队列框架。
+- **结论：**
+  - 缓存/消息队列框架：**论文未报告/不明确**。
+  - 可确认的相关组件：**FAISS**。
+
+## 2. ColBERT（SIGIR 2020；后续 ColBERTv2 等）
+
+- **论文是否报告缓存/消息队列框架？**
+  - 没有。ColBERT 原论文重点是 late interaction、MaxSim、token-level embedding、倒排/向量索引等。
+  - 在线服务通常涉及：查询编码、候选文档检索、late interaction 打分。
+- **是否使用缓存/消息队列？**
+  - 原论文没有把 Redis、Memcached、Kafka 等作为部署框架来报告。
+  - 后续工程实现中可能有各种缓存或服务化设计，但这不是 ColBERT 原论文的明确内容。
+- **结论：**
+  - 缓存/消息队列框架：**论文未报告/不明确**。
+  - 可确认的相关组件：**late interaction 检索/打分流程**，不是缓存或消息队列。
+
+## 3. ANCE（Approximate Nearest Neighbor Negative Contrastive Learning, ICLR 2021）
+
+- **论文是否报告缓存/消息队列框架？**
+  - 没有。ANCE 主要贡献是训练时使用近似最近邻负样本，提升 dense retrieval 的负采样质量。
+  - 它关注的是训练机制和检索质量，不是在线服务的缓存/消息队列部署。
+- **是否使用缓存/消息队列？**
+  - 论文没有明确报告 Redis、Kafka、RabbitMQ 等。
+  - 它通常与 FAISS/ANN 索引相关，但这不是缓存/消息队列框架。
+- **结论：**
+  - 缓存/消息队列框架：**论文未报告/不明确**。
+  - 可确认的相关组件：**ANN 负采样、FAISS/近似最近邻检索**。
+
+## 4. RocketQA（NAACL 2021）
+
+- **论文是否报告缓存/消息队列框架？**
+  - 没有。RocketQA 主要关注 dense passage retrieval 的训练改进：cross-batch negatives、denoised negatives、data augmentation 等。
+  - 论文重点是模型训练和检索效果，不是在线服务基础设施。
+- **是否使用缓存/消息队列？**
+  - 论文没有明确说使用 Redis、Memcached、Kafka、RabbitMQ 等缓存/消息队列框架。
+  - 可能涉及 FAISS 或类似向量检索库，但论文没有把它作为缓存/消息队列框架来描述。
+- **结论：**
+  - 缓存/消息队列框架：**论文未报告/不明确**。
+  - 可确认的相关组件：**dense retriever 训练与向量检索**，不是缓存/消息队列。
+
+## 汇总表
+
+| 论文 | 是否明确使用缓存框架 | 是否明确使用消息队列框架 | 论文中可确认的相关组件 |
+|---|---|---|---|
+| DPR | 未报告 | 未报告 | FAISS 向量索引/检索 |
+| ColBERT | 未报告 | 未报告 | late interaction、向量/倒排检索 |
+| ANCE | 未报告 | 未报告 | ANN 负采样、FAISS/近似最近邻 |
+| RocketQA | 未报告 | 未报告 | dense retriever 训练、向量检索 |
+
+## 最终回答
+
+**DPR、ColBERT、ANCE、RocketQA 的论文都没有明确报告使用某种缓存/消息队列框架来部署在线服务。**  
+它们通常涉及的是 **FAISS/ANN 向量检索、双塔编码、late interaction、负采样训练** 等，而不是 Redis、Memcached、Kafka、RabbitMQ 这类缓存或消息队列框架。若有人声称它们“使用了某个缓存/消息队列框架”，需要看具体工程博客、开源代码或后续系统论文，而不能直接归因于原论文。

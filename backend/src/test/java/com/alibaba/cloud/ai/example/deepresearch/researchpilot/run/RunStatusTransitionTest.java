@@ -78,4 +78,18 @@ class RunStatusTransitionTest {
 		assertTrue(RunStatus.FINALIZING.canTransitionTo(RunStatus.PARTIAL_COMPLETED));
 	}
 
+	@Test
+	void queuedTransitions() {
+		// P0-B：排队入列与补位
+		assertTrue(RunStatus.PLANNING.canTransitionTo(RunStatus.QUEUED));
+		assertTrue(RunStatus.WAITING_APPROVAL.canTransitionTo(RunStatus.QUEUED));
+		assertTrue(RunStatus.QUEUED.canTransitionTo(RunStatus.RESEARCHING));
+		assertTrue(RunStatus.QUEUED.canTransitionTo(RunStatus.CANCELLED));
+		// 排队中的 run 不允许跳到执行完成态或回退
+		assertFalse(RunStatus.QUEUED.canTransitionTo(RunStatus.COMPLETED));
+		assertFalse(RunStatus.QUEUED.canTransitionTo(RunStatus.PLANNING));
+		// QUEUED 不是终态
+		assertFalse(RunStatus.QUEUED.isTerminal());
+	}
+
 }

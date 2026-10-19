@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -19,8 +20,29 @@ public class LlmUsageRecorder {
 
 	private static final Logger logger = LoggerFactory.getLogger(LlmUsageRecorder.class);
 
+	private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+	public LlmUsageRecorder(io.micrometer.core.instrument.MeterRegistry meterRegistry) {
+		this.meterRegistry = meterRegistry;
+	}
+
 	public void record(String stage, long elapsedMs, Integer promptTokens, Integer completionTokens, boolean success,
 			String errorCode) {
+		// P1-D：token 与失败计数进 Micrometer（Prometheus 抓取）；usage 缺失时只计调用
+		if (meterRegistry != null) {
+			if (promptTokens != null) {
+				meterRegistry.counter("rp_llm_tokens_total", "stage", stage, "type", "prompt").increment(promptTokens);
+			}
+			if (completionTokens != null) {
+				meterRegistry.counter("rp_llm_tokens_total", "stage", stage, "type", "completion")
+					.increment(completionTokens);
+			}
+			if (!success) {
+				meterRegistry.counter("rp_llm_calls_failed", "stage", stage).increment();
+			}
+			meterRegistry.timer("rp_llm_call_duration", "stage", stage)
+				.record(Math.max(0, elapsedMs), TimeUnit.MILLISECONDS);
+		}
 		Map<String, Object> event = new LinkedHashMap<>();
 		event.put("event", "LLM_CALL_COMPLETED");
 		event.put("stage", stage == null || stage.isBlank() ? "unknown" : stage);

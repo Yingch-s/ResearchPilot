@@ -1,0 +1,99 @@
+# A4 · basic · round 3
+
+DPR、ColBERT、ANCE、RocketQA 各自的索引结构与检索效率特征是什么？
+
+---
+
+# DPR、ColBERT、ANCE、RocketQA 的索引结构与检索效率特征
+
+## 重要说明
+
+在回答之前需要指出：**所提供的资料片段仅覆盖了 DPR、ANCE、RocketQA 三个对象的部分信息，完全没有涉及 ColBERT**。因此，对于 ColBERT 我将明确说明"资料中未找到"，不做编造。同时，资料片段对索引结构的直接描述非常有限，多数内容是关于训练方法的，我会严格区分"有依据的结论"与"推测"。
+
+---
+
+## 一、DPR（Dense Passage Retrieval）
+
+### 资料中有依据的结论
+- DPR 属于**稠密段落检索器（dense passage retriever）**，采用 **dual-encoder（双编码器）架构**学习问题和段落的稠密表示以进行语义匹配（片段1、片段3）。
+- DPR 使用 **in-batch 随机采样**，并从 **BM25 检索结果中进行硬负采样**（片段3："Both DRP and ME-BERT use in-batch random sampling and hard negative sampling from the results retrieved by BM25"）。
+- 在 OpenQA 实验中，DPR 被作为基线检索器，其检索结果可被 ANCE 替换以评估下游 reader 的表现（片段4、片段5）。
+
+### 资料中未找到的信息
+- DPR 的具体索引结构（如是否使用 FAISS、IVF、HNSW 等近似最近邻索引）——**资料中未提及**。
+- DPR 的检索效率数值（如 QPS、延迟、索引大小）——**资料中未提及**。
+
+### 我的推测（非资料依据）
+- 由于 DPR 是 dual-encoder 稠密检索，通常需要对所有段落预计算向量并建立向量索引以支持高效的最大内积搜索（MIPS）。但具体索引类型需查阅 DPR 原论文，本资料无法确认。
+
+---
+
+## 二、ColBERT
+
+### 资料中有依据的结论
+- **无**。所提供的五个片段中**完全没有出现 ColBERT**。
+
+### 资料中未找到的信息
+- ColBERT 的索引结构（如是否采用 late interaction、token-level 向量、压缩索引等）——**资料中未找到**。
+- ColBERT 的检索效率特征——**资料中未找到**。
+
+### 我的推测
+- 根据我的背景知识，ColBERT 以 **late interaction** 和 **token 级多向量表示**为特征，索引结构与 DPR 类单向量稠密检索不同。但**这属于我的推测，不是本资料中的依据**，建议查阅 ColBERT 原论文（Khattab & Zaharia, 2020）确认。
+
+---
+
+## 三、ANCE（Approximate Nearest Neighbor Negative Contrastive Estimation）
+
+### 资料中有依据的结论
+- ANCE 属于**稠密段落检索器**（片段3）。
+- ANCE 通过**使用稠密检索器本身来增强硬负采样**（片段3："ANCE enhances the hard negative sampling by using the dense retriever"），这与 DPR 从 BM25 结果中采样硬负例形成对比。
+- 资料片段5提到有 **"Table 5: Efficiency of ANCE Search and Training"**，说明原文确实报告了 ANCE 的搜索与训练效率，但**表格内容未在片段中给出**。
+- 实验评估了 ANCE 更好的检索是否能传递到更好的答案准确率，方法是将 SOTA 系统的 reader 从 DPR 检索切换到 ANCE 检索（片段4、片段5）。
+
+### 资料中未找到的信息
+- ANCE 的具体索引结构（如是否使用 FAISS、是否异步刷新索引等）——**资料中未提及**。
+- ANCE 检索效率的具体数值——**资料中未给出**（仅知原文有 Table 5，但内容缺失）。
+
+### 我的推测（非资料依据）
+- ANCE 的核心思想是用稠密检索器自身迭代地挖掘硬负例，这通常需要**定期重建/刷新 ANN 索引**以反映更新后的编码器。但具体索引实现需查阅 ANCE 原论文（Xiong et al., 2020）。
+
+---
+
+## 四、RocketQA
+
+### 资料中有依据的结论
+- RocketQA 是一种**优化的训练方法**，用于改进稠密段落检索，基于 **dual-encoder 架构**（片段1、片段2）。
+- RocketQA 的三大技术贡献（片段1、片段2）：
+  1. **Cross-batch negatives**：相比 in-batch negatives，增加每个问题可用的负例数量，缓解训练与推理之间的差异。
+  2. **Denoised hard negatives**：从检索器 top-ranked 结果中去除假负例，得到更可靠的硬负例。
+  3. **Data augmentation**：利用 cross-encoder 为大规模无监督数据生成高质量伪标签，用于训练 dual-encoder 检索器。
+- RocketQA 在 **MSMARCO 和 Natural Questions** 上显著优于之前的最优模型（片段1）。
+- 基于 RocketQA 检索器可以提升端到端 QA 的性能（片段1）。
+
+### 资料中未找到的信息
+- RocketQA 的**索引结构**——资料中**完全没有描述**。片段只涉及训练策略，未提及索引构建方式。
+- RocketQA 的**检索效率特征**（如延迟、QPS、索引大小）——**资料中未提及**。
+
+### 我的推测（非资料依据）
+- 由于 RocketQA 仍是 dual-encoder 稠密检索器，其索引结构可能类似于 DPR/ANCE 的向量索引范式。但**这是推测，资料中无依据**。
+
+---
+
+## 五、汇总对比表
+
+| 对象 | 索引结构（资料依据） | 检索效率（资料依据） | 资料缺口 |
+|------|---------------------|---------------------|---------|
+| DPR | 未描述具体索引；仅知为 dual-encoder 稠密检索 | 未提及 | 索引类型、效率数值均缺失 |
+| ColBERT | **完全未涉及** | **完全未涉及** | 全部缺失 |
+| ANCE | 未描述具体索引；仅知用稠密检索器增强硬负采样 | 原文有 Table 5 但内容未给出 | 索引类型、效率数值缺失 |
+| RocketQA | **未描述索引结构**；仅知为 dual-encoder 训练方法 | 未提及 | 索引与效率均缺失 |
+
+---
+
+## 六、结论
+
+1. **资料能支持的内容主要集中在训练方法层面**：DPR 的 in-batch + BM25 硬负采样、ANCE 的稠密检索器硬负采样、RocketQA 的三大训练策略。
+2. **关于"索引结构"**：五个片段均未直接描述任何一方的索引实现细节（如 FAISS、IVF、HNSW、late interaction 等）。
+3. **关于"检索效率"**：仅知 ANCE 原文有专门的效率表格（Table 5），但片段未提供具体数值；其余对象均未提及。
+4. **ColBERT 在资料中完全缺席**，无法基于本资料回答。
+5. 若需完整回答该研究问题，建议补充检索 DPR、ColBERT、ANCE、RocketQA 各自原论文中关于索引构建与效率实验的章节。

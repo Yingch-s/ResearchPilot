@@ -313,7 +313,9 @@ public class RpClaimVerifier {
 				"""
 				+ claim + "\n\nExcerpts:\n" + sb;
 		try {
-			String raw = nliClient().prompt().user(prompt).call().content();
+			// P0-B：429/503 先退避重试（3 次，2s 基数），重试耗尽才走下方降级路径
+			String raw = com.alibaba.cloud.ai.example.deepresearch.researchpilot.llm.LlmBackoff
+				.call(() -> nliClient().prompt().user(prompt).call().content(), 3, 2000);
 			if (raw == null) {
 				return List.of();
 			}
