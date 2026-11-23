@@ -121,10 +121,8 @@ public final class DeterministicReportComposer {
 		if (report == null || report.isBlank())
 			return report;
 		return report.replaceAll("(?is)<(?!/)[^>]*DSML[^>]*\\bcalls\\s*>.*?</[^>]*DSML[^>]*\\bcalls\\s*>", "")
-			// A malformed legacy protocol must not swallow subsequent report sections.
-			.replaceAll("(?is)<(?!/)[^>]*DSML[^>]*>.*?(?=\\n#{1,6}\\s|\\z)", "")
 			.replaceAll(
-					"(?mi)^\\s*(?:.*DSML.*|invoke name=|parameter name=|calls>|let me search\\.?|I'll research this task\\.?|I['’]ll research this task\\.?).*$",
+					"(?mi)^.*(?:DSML|invoke name=|parameter name=|calls>|\\|\\s*calls>|<\\||let me search\\.?|let me start searching\\.?|I'll research this task\\.?|I['’]ll research this task\\.?|我将先.*检索|先让我.*检索).*$",
 					"")
 			.replaceAll(
 					"(?i)\\b(?:let me search\\.?|let me start searching\\.?|I'll research this task\\.?|I['’]ll research this task\\.?)",

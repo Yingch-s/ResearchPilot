@@ -191,10 +191,10 @@
         <textarea ref="quickInput" v-model="activeQuestion" rows="1" placeholder="继续提问…" aria-label="继续提问" @input="resizeQuickInput" @keydown="submitActiveQuestion" />
         <div class="composer-toolbar">
         <div class="scope" v-if="selectedCount">
-          <span class="dot-ok"></span> {{ selectedCount }} 篇已选资料
+          <span class="dot-ok"></span> {{ selectedCount }} 篇已选资料<span v-if="allowWeb"> · 联网搜索</span>
         </div>
         <div class="scope" v-else-if="readyPapers.length">
-          <span class="dot-warn"></span> 全部 {{ readyPapers.length }} 篇资料
+          <span class="dot-warn"></span> 全部 {{ readyPapers.length }} 篇资料<span v-if="allowWeb"> · 联网搜索</span>
         </div>
         <div class="scope" v-else-if="allowWeb">
           <span class="dot-ok"></span> 联网搜索 · 将引用网页来源
@@ -225,26 +225,7 @@
         <button class="text mobile-close" aria-label="关闭历史面板" @click.stop="closeMobilePanels">×</button>
         <button class="text panel-collapse" :aria-label="studioCollapsed ? '展开对话历史' : '折叠对话历史'" :title="studioCollapsed ? '展开对话历史' : '折叠对话历史'" @click.stop="studioCollapsed = !studioCollapsed">{{ studioCollapsed ? '»' : '«' }}</button>
       </div>
-      <div class="pane-body" v-if="false">
-        <div v-if="savedArtifacts.length">
-          <div class="art-card" v-for="artifact in savedArtifacts" :key="artifact.id" @click="openSavedArtifact(artifact)">
-            <div class="a-title">{{ artifact.title }}</div>
-            <div class="a-sub">
-              <span class="status">{{ artifact.kind === 'REPORT' ? '研究报告' : '证据矩阵' }}</span> · {{ fmt(artifact.created_at) }}
-            </div>
-            <div class="row" style="margin-top: 8px">
-              <button class="text" @click.stop="openSavedArtifact(artifact)">打开</button>
-              <button class="text danger-action" @click.stop="removeSavedArtifact(artifact)">移除</button>
-            </div>
-          </div>
-        </div>
-        <div v-else-if="topicRuns.length" class="empty">研究完成后，报告会自动保存到左侧“研究报告”资料分类。</div>
-        <div v-else-if="runListError" class="empty" role="alert">{{ runListError }}<button class="text" @click="loadRuns">重试</button></div>
-        <div v-else class="empty">研究报告会自动归档到左侧资料库。</div>
-        <button v-if="runsHasMore" class="ghost" :disabled="loadingMoreRuns" @click="loadMoreRuns">{{ loadingMoreRuns ? '加载中…' : '更早的研究' }}</button>
-        <div v-if="runListError && topicRuns.length" class="error-text" role="alert">{{ runListError }}</div>
-      </div>
-      <div class="pane-body history-body" v-else-if="studioTab === 'history'">
+      <div class="pane-body history-body">
         <button class="new-chat" @click="newConversation"><span>＋</span> 新建对话</button>
         <input v-model="historySearch" class="history-search" type="search" placeholder="搜索对话" aria-label="搜索对话" />
         <div v-if="conversations.length" class="history-list">
@@ -256,62 +237,6 @@
           </div>
         </div>
         <div v-else class="empty">你的提问会保存在这里。</div>
-      </div>
-      <div class="pane-body history-body" v-else-if="studioTab === 'notes'">
-        <div v-if="notes.length" class="notes-list">
-          <article v-for="note in notes" :key="note.id" class="note-card">
-            <label class="note-select"><input type="checkbox" :checked="selectedNotes.has(note.id)" @change="toggleNoteForResearch(note.id)" /> 研究时使用</label>
-            <strong>{{ note.favorite ? '★ ' : '' }}{{ note.title }}</strong><small>{{ fmt(note.updated_at) }}</small>
-            <p>{{ note.body }}</p>
-            <button v-if="note.run_id && note.evidence_id" class="text" @click="locateSavedNote(note)">定位证据</button>
-            <button v-if="note.source_quote" class="text" @click="openSavedNote(note)">查看原文</button>
-            <button class="text" @click="editSavedNote(note)">编辑</button>
-            <button class="text" @click="toggleNoteFavorite(note)">{{ note.favorite ? '取消收藏' : '收藏' }}</button>
-            <button class="text" @click="removeNote(note.id)">删除</button>
-          </article>
-        </div>
-        <div v-else class="empty">从引用详情保存的笔记会出现在这里。</div>
-      </div>
-      <div class="pane-body history-body" v-else-if="studioTab === 'memory'">
-        <div class="memory-add">
-          <select v-model="memoryKind" aria-label="记忆类型"><option value="STABLE_PREFERENCE">稳定偏好</option><option value="CONFIRMED_FACT">确认事实</option></select>
-          <textarea v-model="memoryDraft" rows="3" placeholder="只保存你明确确认的专题偏好或事实"></textarea>
-          <button class="ghost" :disabled="!memoryDraft.trim() || memorySaving" @click="addProjectMemory">{{ memorySaving ? '保存中…' : '保存记忆' }}</button>
-        </div>
-        <div v-if="memories.length" class="notes-list">
-          <article v-for="item in memories" :key="item.id" class="note-card"><small>{{ item.kind === 'STABLE_PREFERENCE' ? '稳定偏好' : '确认事实' }}</small><p>{{ item.content }}</p><button class="text" @click="removeProjectMemory(item.id)">移除</button></article>
-        </div>
-        <div v-else class="empty">当前专题还没有用户确认的记忆。</div>
-      </div>
-      <div class="pane-body history-body context-body" v-else-if="studioTab === 'context'">
-        <div class="context-intro">勾选排除后，下一次回答不会装配这些内容。原始消息和研究成果仍会保留，可随时恢复。</div>
-        <div v-if="contextBusy" class="empty">正在读取上下文…</div>
-        <template v-else>
-          <section class="context-section">
-            <div class="context-section-title">最近对话</div>
-            <label v-for="item in contextData.messages" :key="item.id" class="context-item">
-              <input type="checkbox" :checked="!isContextExcluded('message_ids', item.id)" @change="toggleContext('message_ids', item.id, $event.target.checked)" />
-              <span><b>{{ item.role === 'user' ? '你' : 'ResearchPilot' }}</b> · {{ item.content }}</span>
-            </label>
-            <div v-if="!contextData.messages.length" class="context-empty">暂无可选消息</div>
-          </section>
-          <section class="context-section">
-            <div class="context-section-title">专题记忆</div>
-            <label v-for="item in contextData.memories" :key="item.id" class="context-item">
-              <input type="checkbox" :checked="!isContextExcluded('memory_ids', item.id)" @change="toggleContext('memory_ids', item.id, $event.target.checked)" />
-              <span><b>{{ item.kind === 'STABLE_PREFERENCE' ? '偏好' : '确认事实' }}</b> · {{ item.content }}</span>
-            </label>
-            <div v-if="!contextData.memories.length" class="context-empty">暂无专题记忆</div>
-          </section>
-          <section class="context-section">
-            <div class="context-section-title">研究状态</div>
-            <label v-for="item in contextData.runs" :key="item.id" class="context-item">
-              <input type="checkbox" :checked="!isContextExcluded('run_ids', item.id)" @change="toggleContext('run_ids', item.id, $event.target.checked)" />
-              <span><b>{{ zhRun(item.status) }}</b> · {{ item.query }}</span>
-            </label>
-            <div v-if="!contextData.runs.length" class="context-empty">暂无关联研究任务</div>
-          </section>
-        </template>
       </div>
     </div>
   </div>
@@ -747,7 +672,6 @@ function runCommand(action) {
   if (action === 'input') nextTick(() => quickInput.value?.focus())
   else if (action === 'sources') { sourceMobile.value = true; studioMobile.value = false; srcCollapsed.value = false }
   else if (action === 'history') { studioTab.value = 'history'; studioMobile.value = true; sourceMobile.value = false; studioCollapsed.value = false }
-  else if (action === 'artifacts') { studioTab.value = 'artifacts'; studioMobile.value = true; sourceMobile.value = false; studioCollapsed.value = false }
   else if (action === 'stop') stop()
 }
 function showDialog(options) {
@@ -854,9 +778,15 @@ function currentResearchDetail(current) {
 function messageSourceLabel(message) {
   const citations = Array.isArray(message?.citations) ? message.citations : []
   const webCount = citations.filter(citation => String(citation?.sourceType || citation?.source_type || '').toUpperCase() === 'WEB').length
-  if (webCount) return `已使用 ${webCount} 个网页来源`
+  if (message?.citationQuality && message.citationQuality.verified === false) return '部分引用需要核对原文'
+  const supportReview = Array.isArray(message?.citationQuality?.support?.review)
+    ? message.citationQuality.support.review.length
+    : 0
+  if (supportReview) return `${supportReview} 个引用与原文相关性偏低，建议核对原文`
+  const referencedCount = Number(message?.citationQuality?.referenced_count)
+  if (webCount) return `已使用 ${Number.isFinite(referencedCount) && referencedCount > 0 ? referencedCount : webCount} 个网页来源`
   if (message?.general) return '通用回答 · 未依据专题资料'
-  if (citations.length) return `基于 ${citations.length} 个资料来源`
+  if (citations.length) return `已引用 ${Number.isFinite(referencedCount) && referencedCount > 0 ? referencedCount : citations.length} 个资料来源`
   return ''
 }
 function runSeenKey(runId) { return `researchpilot-run-seen-${topicId}-${runId}` }
@@ -941,7 +871,7 @@ async function loadConversations() {
           parentSessionId: session.parent_session_id || null, branchMessageId: session.branch_message_id || null,
           messages: (rows || []).map(m => {
             const metadata = parseJson(m.metadata)
-            return { id: m.id, role: m.role, text: m.content, citations: parseCitations(m.citations), isReport: metadata?.type === 'research_report', runId: metadata?.run_id }
+            return { id: m.id, role: m.role, text: m.content, citations: parseCitations(m.citations), citationQuality: metadata?.citation_quality || null, isReport: metadata?.type === 'research_report', runId: metadata?.run_id }
           }),
           updatedAt: session.updated_at || new Date().toISOString()
         })
@@ -963,7 +893,6 @@ async function loadConversations() {
     try { if (remoteDraft?.draft) applyDraft(JSON.parse(remoteDraft.draft)) } catch {}
   }
   if (initial.id !== requested) router.replace({ query: { ...route.query, session: initial.id } })
-  await loadContext()
 }
 async function loadContext() {
   if (!activeConversationId.value) return
@@ -1118,7 +1047,7 @@ async function switchConversation(id) {
     const rows = await api.messages(topicId, id)
     c.messages = (rows || []).map(m => {
       const metadata = parseJson(m.metadata)
-      return { id: m.id, role: m.role, text: m.content, citations: parseCitations(m.citations), isReport: metadata?.type === 'research_report', runId: metadata?.run_id }
+      return { id: m.id, role: m.role, text: m.content, citations: parseCitations(m.citations), citationQuality: metadata?.citation_quality || null, isReport: metadata?.type === 'research_report', runId: metadata?.run_id }
     })
   } catch { /* keep the local copy when the remote session is temporarily unavailable */ }
   if (activeConversationId.value !== id) return
@@ -1129,7 +1058,6 @@ async function switchConversation(id) {
   await nextTick()
   switchingConversation = false
   studioTab.value = 'history'
-  loadContext()
   await nextTick()
   setTimeout(scrollChat, 50)
 }
@@ -1318,7 +1246,7 @@ async function ask(retryMessage = null) {
   try {
     const body = await api.askStream(topicId, q, scopePaperIds, noReady, activeConversationId.value, controller.signal, allowWeb.value, messageId, conversation?.parentSessionId || null, conversation?.branchMessageId || null)
     if (!body?.getReader) throw new Error('当前浏览器不支持流式回答')
-    streamedMessage = { role: 'assistant', text: '', citations: [], scope: scopeCount, general: noReady, streaming: true, requestId: messageId }
+    streamedMessage = { role: 'assistant', text: '', citations: [], citationQuality: null, scope: scopeCount, general: noReady, streaming: true, requestId: messageId }
     targetMessages.push(streamedMessage)
     const reader = body.getReader()
     const decoder = new TextDecoder()
@@ -1341,6 +1269,7 @@ async function ask(retryMessage = null) {
           if (eventName === 'complete') completed = true
           if (event.text) streamedMessage.text += event.text
           if (event.citations) streamedMessage.citations = parseCitations(event.citations)
+          if (event.citation_quality) streamedMessage.citationQuality = event.citation_quality
           if (event.answer && !streamedMessage.text) streamedMessage.text = event.answer
         await nextTick()
         if (chatAtBottom.value) scrollChat()
@@ -1711,7 +1640,7 @@ async function retryStep(stepIndex) {
 // ---- Run ----
 async function openReportFocus(runId) {
   const r = await api.run(runId)
-  await openFocus(r, 'matrix')
+  await openFocus(r, 'report')
 }
 async function openRun(r) { await openRunById(r.id); mode.value = 'deep'; deepStage.value = 'run'; router.replace({ query: { ...route.query, run: r.id } }) }
 async function openRunById(id) {
@@ -1946,7 +1875,7 @@ async function tick() {
           if (origin && reportMessage && !origin.messages.some(m => m.runId === completedRunId)) {
             const m = reportMessage
             const metadata = parseJson(m.metadata)
-            origin.messages.push({ role: m.role, text: m.content, citations: parseCitations(m.citations), isReport: metadata?.type === 'research_report', runId: metadata?.run_id })
+            origin.messages.push({ role: m.role, text: m.content, citations: parseCitations(m.citations), citationQuality: metadata?.citation_quality || null, isReport: metadata?.type === 'research_report', runId: metadata?.run_id })
             origin.updatedAt = new Date().toISOString()
             if (originSessionId === activeConversationId.value) msgs.value = origin.messages
             localStorage.setItem(conversationKey, JSON.stringify(conversations.value))
@@ -2104,11 +2033,8 @@ onMounted(async () => {
   topic.value = (await api.topics()).find(t => t.id === topicId) || {}
   await loadPapers()
   await loadWebSnapshots()
-  await loadNotes()
-  await loadMemory()
   if (disposed) return
   await loadRuns()
-  await loadSavedArtifacts()
   workspaceReady = true
   await restoreRouteState()
   if (disposed) return

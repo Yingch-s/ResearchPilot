@@ -40,7 +40,7 @@
       </div>
     </div>
     <div v-else-if="loading" class="empty-state" role="status">正在加载专题…</div>
-    <div v-else-if="loadError" class="empty-state" role="alert"><strong>{{ loadError }}</strong><button @click="loadTopics">重试</button></div>
+    <div v-else-if="loadError" class="empty-state" role="alert"><strong>{{ loadError }}</strong><span v-if="loadErrorHint" class="hint">{{ loadErrorHint }}</span><button @click="loadTopics">重试</button></div>
     <div v-else-if="q || archived" class="empty-state"><strong>{{ q ? '没有匹配的专题' : '没有已归档专题' }}</strong><button v-if="q" class="ghost" @click="q = ''">清除搜索</button></div>
     <div v-else class="empty-state">
       <div class="empty-icon">＋</div><strong>还没有研究专题</strong><span>新建一个专题，上传论文后开始研究。</span><button @click="showNew = true">新建第一个专题</button>
@@ -69,6 +69,7 @@ const topics = ref([])
 const archived = ref(false)
 const loading = ref(false)
 const loadError = ref('')
+const loadErrorHint = ref('')
 const busy = ref(false)
 const actionError = ref('')
 const action = ref(null)
@@ -150,13 +151,26 @@ async function performAction() {
 async function setArchived(value) { archived.value = value; await loadTopics() }
 async function loadTopics() {
   const version = ++loadVersion
-  loading.value = true; loadError.value = ''; topics.value = []
+  loading.value = true; loadError.value = ''; loadErrorHint.value = ''; topics.value = []
   try {
     const loaded = await api.topics(archived.value)
     if (version !== loadVersion) return
     topics.value = loaded
     for (const t of loaded) { try { papersCache[t.id] = await api.papers(t.id) } catch { papersCache[t.id] = [] } }
-  } catch (error) { if (version === loadVersion) loadError.value = error.message || '专题加载失败' }
+  } catch (error) {
+    if (version === loadVersion) {
+      if (error?.status === 401) {
+        loadError.value = '登录状态已失效，请重新登录。'
+      }
+      else if (error?.status >= 500) {
+        loadError.value = '专题暂时无法加载。'
+        loadErrorHint.value = '服务正在恢复或配置尚未完成，可以稍后重试。'
+      }
+      else {
+        loadError.value = error.message || '专题加载失败。'
+      }
+    }
+  }
   finally { if (version === loadVersion) loading.value = false }
 }
 

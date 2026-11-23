@@ -17,6 +17,7 @@
 package com.alibaba.cloud.ai.example.deepresearch.researchpilot.web;
 
 import com.alibaba.cloud.ai.example.deepresearch.researchpilot.retrieve.RpRetrievalService;
+import com.alibaba.cloud.ai.example.deepresearch.researchpilot.ask.CitationSupportVerifier;
 import com.alibaba.cloud.ai.example.deepresearch.researchpilot.store.RpObjectStore;
 import com.alibaba.cloud.ai.example.deepresearch.researchpilot.store.RpRepository;
 import com.alibaba.cloud.ai.example.deepresearch.researchpilot.sidecar.SidecarClient;
@@ -104,6 +105,9 @@ public class RpController {
 	// V1 UX-1：快速提问服务
 	@org.springframework.beans.factory.annotation.Autowired
 	private transient com.alibaba.cloud.ai.example.deepresearch.researchpilot.ask.RpAskService askService;
+
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private transient CitationSupportVerifier citationSupportVerifier;
 
 	@org.springframework.beans.factory.annotation.Autowired
 	private transient com.alibaba.cloud.ai.example.deepresearch.researchpilot.source.PaperDiscoveryService paperDiscovery;
@@ -628,7 +632,7 @@ public class RpController {
 						sessionId + ":" + messageId);
 			}
 			var existing = jdbc.queryForList(
-					"SELECT role, content, citations FROM rp_chat_messages WHERE session_id = ? AND message_id = ? ORDER BY role DESC",
+					"SELECT role, content, citations, metadata FROM rp_chat_messages WHERE session_id = ? AND message_id = ? ORDER BY role DESC",
 					sessionId, messageId);
 			if (!existing.isEmpty()) {
 				var assistant = existing.stream()
@@ -638,6 +642,18 @@ public class RpController {
 				Map<String, Object> out = new HashMap<>();
 				out.put("answer", visibleText(assistant.get("content")));
 				out.put("citations", sanitizeCitations(assistant.get("citations")));
+				if (assistant.get("metadata") != null) {
+					try {
+						Object metadata = new com.fasterxml.jackson.databind.ObjectMapper()
+							.readValue(String.valueOf(assistant.get("metadata")), Object.class);
+						if (metadata instanceof Map<?, ?> map && map.get("citation_quality") != null) {
+							out.put("citation_quality", map.get("citation_quality"));
+						}
+					}
+					catch (Exception ignored) {
+						// Legacy messages may contain empty or malformed metadata.
+					}
+				}
 				out.put("used_papers", 0);
 				return out;
 			}
@@ -666,6 +682,7 @@ public class RpController {
 		var result = askService.ask(topicId, req.paper_ids(), req.question(), Boolean.TRUE.equals(req.allow_general()),
 				Boolean.TRUE.equals(req.allow_web()), modelQuestion);
 		String visibleAnswer = visibleText(result.answer());
+		Map<String, Object> resultCitationQuality = citationQuality(result.answer(), result.citations());
 		if (sessionId != null && !Boolean.TRUE.equals(suppressAskPersistence.get())) {
 			try {
 				jdbc.update(
@@ -682,9 +699,11 @@ public class RpController {
 				try {
 					String citationJson = new com.fasterxml.jackson.databind.ObjectMapper()
 						.writeValueAsString(result.citations());
+					String metadataJson = new com.fasterxml.jackson.databind.ObjectMapper()
+						.writeValueAsString(Map.of("citation_quality", resultCitationQuality));
 					jdbc.update(
-							"INSERT INTO rp_chat_messages (session_id, role, content, citations, message_id) VALUES (?, 'assistant', ?, ?::jsonb, ?)",
-							sessionId, visibleAnswer, citationJson, messageId);
+							"INSERT INTO rp_chat_messages (session_id, role, content, citations, metadata, message_id) VALUES (?, 'assistant', ?, ?::jsonb, ?::jsonb, ?)",
+							sessionId, visibleAnswer, citationJson, metadataJson, messageId);
 				}
 				catch (Exception e) {
 					jdbc.update(
@@ -702,7 +721,23 @@ public class RpController {
 		out.put("citations", DeterministicReportComposer.sanitizeStructured(
 				new com.fasterxml.jackson.databind.ObjectMapper().convertValue(result.citations(), Object.class)));
 		out.put("used_papers", result.usedPapers());
+		out.put("citation_quality", resultCitationQuality);
 		return out;
+	}
+
+	private Map<String, Object> citationQuality(String answer, List<?> citations) {
+		var markerQuality = com.alibaba.cloud.ai.example.deepresearch.researchpilot.ask.AnswerQualityGate
+			.validate(answer, citations == null ? 0 : citations.size());
+		Map<String, Object> quality = new HashMap<>();
+		quality.put("verified", markerQuality.verified());
+		quality.put("referenced", markerQuality.referenced());
+		quality.put("invalid", markerQuality.invalid());
+		quality.put("source_count", citations == null ? 0 : citations.size());
+		quality.put("referenced_count", markerQuality.referenced().size());
+		if (citationSupportVerifier != null) {
+			quality.put("support", citationSupportVerifier.verify(answer, citations).asMap());
+		}
+		return quality;
 	}
 
 	/**
@@ -734,6 +769,10 @@ public class RpController {
 				visibleResult.put("answer", visibleText(result.getOrDefault("answer", "")));
 				visibleResult.put("citations",
 						DeterministicReportComposer.sanitizeStructured(result.getOrDefault("citations", List.of())));
+				Object rawCitations = result.getOrDefault("citations", List.of());
+				visibleResult.put("citation_quality",
+						citationQuality(String.valueOf(visibleResult.getOrDefault("answer", "")),
+								rawCitations instanceof List<?> list ? list : List.of()));
 				String answer = String.valueOf(visibleResult.getOrDefault("answer", ""));
 				for (int start = 0; start < answer.length();) {
 					if (Thread.currentThread().isInterrupted()) {
@@ -794,12 +833,15 @@ public class RpController {
 					sessionId, topicId, req.question().substring(0, Math.min(40, req.question().length())));
 			String citationJson = new com.fasterxml.jackson.databind.ObjectMapper()
 				.writeValueAsString(result.getOrDefault("citations", List.of()));
+			String metadataJson = new com.fasterxml.jackson.databind.ObjectMapper()
+				.writeValueAsString(Map.of("citation_quality", result.getOrDefault("citation_quality", Map.of())));
 			jdbc.update("INSERT INTO rp_chat_messages (session_id, role, content) VALUES (?, 'user', ?)", sessionId,
 					req.question());
 			jdbc.update(
-					"INSERT INTO rp_chat_messages (session_id, role, content, citations, message_id) "
-							+ "VALUES (?, 'assistant', ?, ?::jsonb, ?)",
-					sessionId, String.valueOf(result.getOrDefault("answer", "")), citationJson, messageId);
+					"INSERT INTO rp_chat_messages (session_id, role, content, citations, metadata, message_id) "
+							+ "VALUES (?, 'assistant', ?, ?::jsonb, ?::jsonb, ?)",
+					sessionId, String.valueOf(result.getOrDefault("answer", "")), citationJson, metadataJson,
+					messageId);
 		}
 		catch (Exception e) {
 			throw new IllegalStateException("回答保存失败，请使用同一消息 ID 重试", e);

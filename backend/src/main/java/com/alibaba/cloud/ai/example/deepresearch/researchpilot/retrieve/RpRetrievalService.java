@@ -189,12 +189,50 @@ public class RpRetrievalService {
 		candidates
 			.sort(java.util.Comparator.<Candidate>comparingDouble(c -> c.fusedScore() + sectionBoost(c.sectionPath()))
 				.reversed());
-		if (candidates.size() > topK) {
-			candidates = new ArrayList<>(candidates.subList(0, topK));
-		}
+		candidates = diversify(candidates, topK);
 		logger.info("RP 检索: bm25={} dense={} fused_top={} query='{}'", channelA.size(), channelB.size(),
 				candidates.size(), query);
 		return candidates;
+	}
+
+	/**
+	 * Keep a high-ranked answer from being built entirely from one paper or one repeated
+	 * parent section. RRF rewards agreement between channels, but it does not provide
+	 * source diversity by itself.
+	 */
+	static List<Candidate> diversify(List<Candidate> ranked, int topK) {
+		if (ranked.isEmpty() || topK <= 0) {
+			return List.of();
+		}
+		Map<String, Integer> papers = new LinkedHashMap<>();
+		Map<String, Integer> parents = new LinkedHashMap<>();
+		List<Candidate> selected = new ArrayList<>();
+		for (Candidate candidate : ranked) {
+			String paper = candidate.paperId() == null ? "" : candidate.paperId();
+			String parent = candidate.parentId() == null ? candidate.chunkId() : candidate.parentId();
+			if (papers.getOrDefault(paper, 0) >= 3 || parents.getOrDefault(parent, 0) >= 2) {
+				continue;
+			}
+			selected.add(candidate);
+			papers.merge(paper, 1, Integer::sum);
+			parents.merge(parent, 1, Integer::sum);
+			if (selected.size() == topK) {
+				break;
+			}
+		}
+		// A single-paper/single-section query should still return all useful hits
+		// when diversity limits would otherwise make the source pack too small.
+		if (selected.size() < topK) {
+			for (Candidate candidate : ranked) {
+				if (!selected.contains(candidate)) {
+					selected.add(candidate);
+				}
+				if (selected.size() == topK) {
+					break;
+				}
+			}
+		}
+		return selected;
 	}
 
 	private static boolean isReferenceSection(String section) {
@@ -225,7 +263,8 @@ public class RpRetrievalService {
 			String embeddingIdentity, String channelsKey) {
 		List<String> scope = paperIds == null ? List.of() : paperIds.stream().sorted().toList();
 		return String.join("|", String.valueOf(topicId), String.join(",", scope), normalizeQuery(query),
-				String.valueOf(topK), String.valueOf(withParentExpansion), embeddingIdentity);
+				String.valueOf(topK), String.valueOf(withParentExpansion), embeddingIdentity,
+				channelsKey == null ? "both" : channelsKey);
 	}
 
 	private static String normalizeQuery(String query) {

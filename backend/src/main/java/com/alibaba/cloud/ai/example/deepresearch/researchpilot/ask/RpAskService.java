@@ -23,10 +23,11 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-
-import java.util.List;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import com.alibaba.cloud.ai.example.deepresearch.researchpilot.usage.LlmUsageRecorder;
@@ -154,7 +155,7 @@ public class RpAskService {
 
 	public AskResult ask(String topicId, List<String> paperIds, String question, boolean allowGeneral, boolean allowWeb,
 			String conversationContext) {
-		// 1. 意图识别（轻量分类，失败回退 material = 原行为）
+		// 1. 先用确定性路由决定回答策略。控制决策不再为每个问题额外调用模型。
 		String intent = classifyIntent(question);
 		if ("chitchat".equals(intent)) {
 			// 问候/闲聊：正常说话，不检索、无引用、无模板
@@ -171,7 +172,8 @@ public class RpAskService {
 			logger.warn("快速提问检索失败: {}", e.getMessage());
 			return new AskResult("在当前所选资料中未找到足够依据（检索失败，请稍后重试）。", List.of(), 0);
 		}
-		// 系统判断是否需要联网：论文库零命中或弱命中（<3 条）且网络搜索可用 → 补充网络来源
+		// 联网搜索是用户显式选择的来源。开启后一定执行一次搜索，但本地论文和网页
+		// 会在 Source Pack 中分层，避免网页片段悄悄替代专题原文。
 		List<RpWebSearchService.WebResult> webResults = List.of();
 		if (allowWeb && !webSearch.available()) {
 			return new AskResult("联网搜索暂不可用：搜索服务尚未配置。此次没有执行网页搜索，请稍后重试或取消联网搜索后提问。", List.of(), 0);
@@ -194,16 +196,10 @@ public class RpAskService {
 
 		List<Citation> citations = new ArrayList<>();
 		StringBuilder sources = new StringBuilder();
+		Map<String, String> paperSourceUrls = sourceUrls(candidates);
 		for (int i = 0; i < candidates.size(); i++) {
 			var c = candidates.get(i);
-			String savedUrl = null;
-			if (jdbc != null) {
-				var rows = jdbc.queryForList(
-						"SELECT metadata->>'source_url' AS url FROM rp_papers WHERE id = ?::uuid AND metadata->>'source_type' = 'WEB'",
-						c.paperId());
-				if (!rows.isEmpty())
-					savedUrl = (String) rows.get(0).get("url");
-			}
+			String savedUrl = paperSourceUrls.get(c.paperId());
 			citations.add(new Citation(i + 1, c.paperId(), c.chunkId(), c.sectionPath(), c.page(), c.text(),
 					savedUrl == null ? SOURCE_PAPER : SOURCE_WEB, savedUrl));
 			sources.append("[")
@@ -253,7 +249,8 @@ public class RpAskService {
 		catch (Exception e) {
 			logger.warn("快速提问章节背景不可用，保留原文片段");
 		}
-		String contextSources = sources + (background.isBlank() ? "" : "\n章节背景（仅帮助理解上下文，引用仍使用上面的原文编号）：\n" + background);
+		String contextSources = "【可引用来源】\n" + sources
+				+ (background.isBlank() ? "" : "\n【章节背景，仅用于理解，不得新增引用编号】\n" + background);
 		String prompt = guidelines(conversationContext, guideline, contextSources);
 		String answer;
 		try {
@@ -307,7 +304,56 @@ public class RpAskService {
 		if (answer != null) {
 			answer = answer.replace("[[NEED_MORE_SOURCES]]", "").trim();
 		}
-		return new AskResult(answer == null ? "" : answer.trim(), citations, 0);
+		// The first source pack may have been extended by the explicit web fallback.
+		// Rebuild it before the quality repair pass so new web citations are valid
+		// repair targets as well.
+		contextSources = "【可引用来源】\n" + sources + (background.isBlank() ? "" : "\n【章节背景，仅用于理解，不得新增引用编号】\n" + background);
+		AnswerQualityGate.Result quality = AnswerQualityGate.validate(answer, citations.size());
+		if (!allowGeneral && !citations.isEmpty() && (!quality.hasReferences() || !quality.invalid().isEmpty())) {
+			String repaired = repairCitations(question, answer, contextSources, citations.size());
+			AnswerQualityGate.Result repairedQuality = AnswerQualityGate.validate(repaired, citations.size());
+			if (repairedQuality.hasReferences() && repairedQuality.invalid().isEmpty()) {
+				answer = repairedQuality.answer();
+				quality = repairedQuality;
+				logger.info("快速回答通过引用修复闸门: referenced={}", quality.referenced());
+			}
+		}
+		if (!quality.invalid().isEmpty()) {
+			logger.warn("快速回答包含越界引用编号: {}", quality.invalid());
+		}
+		int usedPapers = (int) candidates.stream()
+			.map(RpRetrievalService.Candidate::paperId)
+			.filter(java.util.Objects::nonNull)
+			.distinct()
+			.count();
+		return new AskResult(quality.answer(), citations, usedPapers);
+	}
+
+	/**
+	 * One bounded repair pass keeps a fluent answer from becoming an unsupported answer
+	 * when the model forgot the source namespace. This is deliberately a rewrite pass,
+	 * not an open-ended second research loop.
+	 */
+	private String repairCitations(String question, String answer, String sourcePack, int sourceCount) {
+		String prompt = """
+				请修复下面这段科研问答，使每个可核验的事实句都在句末使用真实来源编号，例如 [1] 或 [2]。
+				只能使用 1 到 %d 的编号，不要创造编号，不要添加来源中没有的事实。
+				保留原问题的语言，删掉无法由来源支持的细节，并保持回答简洁。
+				只输出修复后的回答正文，不要解释修复过程。
+
+				问题：%s
+				原回答：%s
+				来源：
+				%s
+				""".formatted(sourceCount, question, answer == null ? "" : answer, sourcePack);
+		try {
+			String repaired = callWithTimeout(() -> researchAgent.prompt().user(prompt).call().content());
+			return repaired == null ? "" : repaired.trim();
+		}
+		catch (Exception e) {
+			logger.warn("回答引用修复失败，保留原回答: {}", e.getMessage());
+			return answer == null ? "" : answer;
+		}
 	}
 
 	/**
@@ -320,10 +366,10 @@ public class RpAskService {
 								行为准则：
 								1. 用与问题相称的方式回答——简单问题两三句即可，比较类或复杂问题才分段展开；不要使用固定的小节标题模板。
 								2. 诚实优先：资料不足以回答的部分，直接说明"在当前所选资料中未找到足够依据"，不得编造，也不得把资料之外的内容冒充为资料内容。若资料不足以支撑答案的主体，在回答的最后一行单独输出标记 [[NEED_MORE_SOURCES]]。
-								3. 凡某句陈述确实来自某条资料，在该句末尾标注对应编号（如 [2]）；你自己的组织性文字、常识性衔接不要标注编号。
+								3. 事实性句子必须在句末标注一个或多个真实来源编号（如 [2]）。只能使用【可引用来源】中出现的编号，禁止猜测或创造编号。
 								4. 用中文回答。
 								检索片段不代表全文。没有检索到某章节时，只能说“本次检索未找到”，不能断言原资料不存在该内容。用户要求原文和翻译时，先给检索到的原文，再给中文翻译。
-				5. 编号中标注"（网络来源）"的内容来自网页而非本专题论文——涉及这些来源的表述保持编号即可，不要把它们说成论文内容。
+				5. 编号中标注"（网络来源）"的内容来自网页而非本专题论文。涉及这些来源的表述保持编号，并明确说“网页来源”。
 
 								"""
 				+ guideline + "\n\n问题：" + question + "\n\n资料片段：\n" + sources;
@@ -334,29 +380,40 @@ public class RpAskService {
 	 * material（保守，等价旧行为）。
 	 */
 	private String classifyIntent(String question) {
+		return IntentRouter.classify(question);
+	}
+
+	/**
+	 * Resolve URL-backed papers with one database round trip instead of one per citation.
+	 */
+	private Map<String, String> sourceUrls(List<RpRetrievalService.Candidate> candidates) {
+		if (jdbc == null) {
+			return Map.of();
+		}
+		List<String> paperIds = candidates.stream()
+			.map(RpRetrievalService.Candidate::paperId)
+			.filter(java.util.Objects::nonNull)
+			.distinct()
+			.toList();
+		if (paperIds.isEmpty()) {
+			return Map.of();
+		}
+		String placeholders = String.join(",", java.util.Collections.nCopies(paperIds.size(), "?::uuid"));
+		String sql = "SELECT id::text, metadata->>'source_url' AS url FROM rp_papers " + "WHERE id IN (" + placeholders
+				+ ") AND metadata->>'source_type' = 'WEB'";
 		try {
-			String raw = callWithTimeout(() -> researchAgent.prompt().user("""
-					对用户输入做意图分类，只输出 JSON，不要 markdown：
-					{"intent":"chitchat"|"general"|"material"|"locate"}
-
-					- chitchat：问候、寒暄、闲聊，不需要任何资料即可回应
-					- general：知识性问题，与资料内容是否相关不确定
-					- material：针对所提供论文/资料内容的问题
-					- locate：在资料中查找某内容出现的位置
-
-					用户输入：%s
-					""".formatted(question)).call().content());
-			if (raw == null) {
-				return "material";
+			List<Map<String, Object>> rows = jdbc.queryForList(sql, paperIds.toArray());
+			Map<String, String> urls = new HashMap<>();
+			for (Map<String, Object> row : rows) {
+				if (row.get("id") != null && row.get("url") != null) {
+					urls.put(String.valueOf(row.get("id")), String.valueOf(row.get("url")));
+				}
 			}
-			String json = raw.trim().replaceAll("^```[a-zA-Z]*\\s*", "").replaceAll("```\\s*$", "");
-			var m = java.util.regex.Pattern.compile("\"intent\"\\s*:\\s*\"(\\w+)\"").matcher(json);
-			String intent = m.find() ? m.group(1) : "material";
-			return List.of("chitchat", "general", "material", "locate").contains(intent) ? intent : "material";
+			return urls;
 		}
 		catch (Exception e) {
-			logger.warn("意图分类失败（回退 material）: {}", e.getMessage());
-			return "material";
+			logger.warn("来源 URL 批量读取失败，保留论文来源: {}", e.getMessage());
+			return Map.of();
 		}
 	}
 

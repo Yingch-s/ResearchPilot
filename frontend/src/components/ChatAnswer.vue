@@ -2,7 +2,7 @@
   <div class="chat-answer">
     <div class="md" v-html="html" @click="followCitation" />
     <details v-if="citations.length" class="answer-sources" :open="citations.some(item => item.citation.sourceType === 'WEB')">
-      <summary>{{ citations.length }} 处引用 <span>查看来源</span></summary>
+      <summary>{{ citations.length }} 个引用来源 <span>查看来源</span><small v-if="hiddenCitationCount"> · {{ hiddenCitationCount }} 个候选来源未被回答引用</small></summary>
       <article v-for="item in citations" :key="item.number" class="answer-source">
         <button class="answer-source-open" @click="$emit('citation', item.citation)">
           <span class="source-number">{{ item.number }}</span>
@@ -25,7 +25,7 @@ import { md } from '../md.js'
 
 const props = defineProps({ text: String, citations: { type: Array, default: () => [] }, savedSourceUrls: { type: Object, default: () => new Set() }, savingSourceUrls: { type: Object, default: () => new Set() } })
 const emit = defineEmits(['citation', 'save-source'])
-const citations = computed(() => {
+const allCitations = computed(() => {
   const seen = new Set()
   return (props.citations || []).map((citation, index) => ({ citation, number: index + 1 })).filter(({ citation }) => {
     const key = [citation.paperId || citation.paper_id || citation.title || '', citation.sectionPath || citation.section_path || '', citation.page ?? '', citation.text || ''].join('|')
@@ -34,6 +34,19 @@ const citations = computed(() => {
     return true
   })
 })
+const referencedNumbers = computed(() => {
+  const numbers = new Set()
+  for (const match of String(props.text || '').matchAll(/(?:\[(\d+)\]|【(\d+)】)/g)) {
+    const number = Number(match[1] || match[2])
+    if (number > 0 && number <= (props.citations || []).length) numbers.add(number)
+  }
+  return numbers
+})
+const citations = computed(() => {
+  if (!referencedNumbers.value.size) return allCitations.value
+  return allCitations.value.filter(item => referencedNumbers.value.has(item.number))
+})
+const hiddenCitationCount = computed(() => Math.max(0, allCitations.value.length - citations.value.length))
 const html = computed(() => {
   const doc = new DOMParser().parseFromString(md(props.text), 'text/html')
   // Preserve model-written bibliography content, but keep it out of the reading flow.
